@@ -1,14 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  ArrowLeft, 
-  Calculator, 
-  Info, 
-  Save, 
-  Share2,
-  Zap,
-  Box
-} from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Save, Share2, Zap, Box } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 
@@ -25,45 +17,30 @@ export default function Torsion() {
   const [d1, setD1] = useState<number>(50); // mm (Outer diameter or width)
   const [d2, setD2] = useState<number>(30); // mm (Inner diameter or height)
 
-  const results = useMemo(() => {
-    const G = modulus * 1e9; // Pa
-    const T = torque; // Nm
-    const L = length; // m
-    
-    let J = 0; // Polar moment of inertia (m^4)
-    let maxShear = 0; // Pa
-    let angleOfTwist = 0; // Radians
+  const [results, setResults] = useState({
+    maxShear: 0,
+    angleRad: 0,
+    angleDeg: 0,
+    J: 0
+  });
 
-    if (section === 'solid-circular') {
-      const r = (d1 / 1000) / 2;
-      J = (Math.PI * Math.pow(r, 4)) / 2;
-      maxShear = (T * r) / J;
-    } else if (section === 'hollow-circular') {
-      const rOuter = (d1 / 1000) / 2;
-      const rInner = (d2 / 1000) / 2;
-      J = (Math.PI * (Math.pow(rOuter, 4) - Math.pow(rInner, 4))) / 2;
-      maxShear = (T * rOuter) / J;
-    } else if (section === 'rectangular') {
-      // Approximate for rectangular section (a > b)
-      const a = (Math.max(d1, d2) / 1000) / 2;
-      const b = (Math.min(d1, d2) / 1000) / 2;
-      // J_eff for rectangular is complex, using standard approximation
-      // J = a * b^3 * [16/3 - 3.36 * (b/a) * (1 - (b^4)/(12*a^4))]
-      // For simplicity, let's use a common table-based approximation factor
-      const alpha = 0.208; // for a/b = 1.0, varies with ratio
-      J = alpha * Math.pow(Math.max(d1, d2)/1000, 1) * Math.pow(Math.min(d1, d2)/1000, 3);
-      maxShear = T / (0.208 * Math.pow(Math.max(d1, d2)/1000, 1) * Math.pow(Math.min(d1, d2)/1000, 2));
+  useEffect(() => {
+    async function executePythonBackend() {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/torsion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section, torque, length, modulus, d1, d2 })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data);
+        }
+      } catch (err) {
+        console.error("Python Backend Math Verification Failed:", err);
+      }
     }
-
-    angleOfTwist = (T * L) / (G * J);
-    const angleDeg = (angleOfTwist * 180) / Math.PI;
-
-    return {
-      maxShear: maxShear / 1e6, // MPa
-      angleRad: angleOfTwist,
-      angleDeg: angleDeg,
-      J: J * 1e8 // cm^4
-    };
+    executePythonBackend();
   }, [section, torque, length, modulus, d1, d2]);
 
   return (

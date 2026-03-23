@@ -1,8 +1,31 @@
-import { Link } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Compass } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, ArrowRight, Compass, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login, error, setError } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setLoading(true);
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err: any) {
+      // Error is handled by context but we can log or perform additional cleanup
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 bg-engineering-pattern opacity-20 pointer-events-none"></div>
@@ -34,7 +57,14 @@ export default function Login() {
               <p className="body-md text-on-surface-variant">Enter your credentials to access the engineering suite.</p>
             </div>
 
-            <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-error shrink-0 mt-0.5" />
+                <p className="body-sm text-error">{error}</p>
+              </div>
+            )}
+
+            <form className="space-y-8" onSubmit={handleSubmit}>
               <div className="space-y-3">
                 <label className="label-sm text-on-surface-variant block ml-1" htmlFor="email">Work Email</label>
                 <div className="relative group">
@@ -47,6 +77,8 @@ export default function Login() {
                     placeholder="engineer@company.com" 
                     type="email"
                     required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
               </div>
@@ -66,17 +98,20 @@ export default function Login() {
                     placeholder="••••••••" 
                     type="password"
                     required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               </div>
 
-              <Link 
-                to="/dashboard"
-                className="w-full primary-gradient text-on-primary font-bold py-4 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-xl shadow-primary/20"
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full primary-gradient text-on-primary font-bold py-4 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-xl shadow-primary/20 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
               >
-                <span>Sign In</span>
-                <ArrowRight className="w-5 h-5" />
-              </Link>
+                <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+                {!loading && <ArrowRight className="w-5 h-5" />}
+              </button>
             </form>
           </div>
 

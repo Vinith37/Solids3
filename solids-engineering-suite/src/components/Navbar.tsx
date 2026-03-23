@@ -1,6 +1,7 @@
 import { Bell, Search, Download, User, Eye, EyeOff, Menu, X, LogOut, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -8,6 +9,7 @@ interface NavbarProps {
 
 export default function Navbar({ onMenuClick }: NavbarProps) {
   const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -34,9 +36,13 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    // In a real app, clear tokens/session here
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Failed to log out', error);
+    }
   };
 
   return (
@@ -54,15 +60,6 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
             S
           </div>
           <span className="font-black text-lg md:text-xl tracking-tighter text-on-surface uppercase">SOLIDS</span>
-        </div>
-        
-        <div className="hidden md:flex items-center gap-2 bg-surface-container-highest px-4 py-2 rounded-xl transition-all">
-          <Search className="w-4 h-4 text-on-surface-variant" />
-          <input 
-            type="text" 
-            placeholder="Search modules..." 
-            className="bg-transparent border-none outline-none text-sm w-32 lg:w-64 placeholder:text-on-surface-variant font-medium text-on-surface"
-          />
         </div>
       </div>
 
@@ -102,7 +99,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
               <User className="w-5 h-5 text-on-surface-variant" />
             </div>
             <div className="hidden lg:flex items-center gap-1 pr-1">
-              <span className="text-sm font-bold text-on-surface">Eng. Smith</span>
+              <span className="text-sm font-bold text-on-surface">{currentUser?.displayName || 'Engineer'}</span>
               <ChevronDown className={`w-4 h-4 text-on-surface-variant transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
             </div>
           </button>
@@ -111,7 +108,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
             <div className="absolute right-0 mt-2 w-48 bg-surface-container-low border border-outline/10 rounded-2xl ambient-shadow overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="px-4 py-3 border-b border-outline/5 mb-2">
                 <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Account</p>
-                <p className="text-sm font-medium text-on-surface truncate">smith@engineering.co</p>
+                <p className="text-sm font-medium text-on-surface truncate">{currentUser?.email || 'user@engineering.co'}</p>
               </div>
               
               <button 

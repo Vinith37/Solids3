@@ -1,8 +1,30 @@
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ArrowRight, Lock } from 'lucide-react';
+import { ChevronLeft, ArrowRight, Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ForgotPassword() {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const { resetPassword, error, setError } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setMessage('');
+      setError(null);
+      setLoading(true);
+      await resetPassword(email);
+      setMessage('We have sent you an email with instructions to reset your password. Please check your inbox.');
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 bg-engineering-pattern opacity-20 pointer-events-none"></div>
@@ -50,22 +72,41 @@ export default function ForgotPassword() {
                   Enter your work email and we will send you a link to reset your password.
                 </p>
               </div>
-              <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+
+              {error && (
+                <div className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-error shrink-0 mt-0.5" />
+                  <p className="body-sm text-error">{error}</p>
+                </div>
+              )}
+
+              {message && (
+                <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20 flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <p className="body-sm text-primary">{message}</p>
+                </div>
+              )}
+
+              <form className="space-y-8" onSubmit={handleSubmit}>
                 <div className="space-y-3">
                   <label className="label-sm text-on-surface-variant block ml-1">Work Email Address</label>
                   <input 
                     className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none" 
                     placeholder="name@company.com" 
                     type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                <Link 
-                  to="/reset-password"
-                  className="w-full primary-gradient text-on-primary font-bold py-4 px-8 rounded-full shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full primary-gradient text-on-primary font-bold py-4 px-8 rounded-full shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
                 >
-                  <span>Send Reset Link</span>
-                  <ArrowRight className="w-5 h-5" />
-                </Link>
+                  <span>{loading ? 'Sending...' : 'Send Reset Link'}</span>
+                  {!loading && <ArrowRight className="w-5 h-5" />}
+                </button>
               </form>
               <div className="mt-12 pt-10 border-t border-outline/10 flex flex-col items-center gap-6">
                 <Link to="/login" className="body-sm font-bold text-primary hover:text-primary-dim flex items-center gap-2 transition-colors">
