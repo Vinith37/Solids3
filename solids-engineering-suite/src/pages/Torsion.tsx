@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calculator, Info, Save, Share2, Zap, Box } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 
 type SectionType = 'solid-circular' | 'hollow-circular' | 'rectangular';
 
 export default function Torsion() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [section, setSection] = useState<SectionType>('solid-circular');
   const [torque, setTorque] = useState<number>(500); // Nm
   const [length, setLength] = useState<number>(2); // m
@@ -25,9 +27,28 @@ export default function Torsion() {
   });
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setSection(data.state.section);
+            setTorque(data.state.torque);
+            setLength(data.state.length);
+            setModulus(data.state.modulus);
+            setD1(data.state.d1);
+            setD2(data.state.d2);
+          }
+        });
+    }
+  }, [location.search]);
+
+  useEffect(() => {
     async function executePythonBackend() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/torsion", {
+        const response = await fetch(apiUrl('/api/torsion'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ section, torque, length, modulus, d1, d2 })
@@ -42,6 +63,27 @@ export default function Torsion() {
     }
     executePythonBackend();
   }, [section, torque, length, modulus, d1, d2]);
+
+  const saveState = async () => {
+    const name = prompt("Name this calculation:", `Torsion Analysis ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Torsion",
+          module: "/torsion",
+          state: { section, torque, length, modulus, d1, d2 }
+        })
+      });
+      alert("Archived successfully!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
   return (
     <MainLayout>
@@ -60,7 +102,10 @@ export default function Torsion() {
             <p className="body-md text-on-surface-variant">Calculate shear stress and twist for various shaft cross-sections with precise analytical approximations.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save State
             </button>

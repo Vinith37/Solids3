@@ -13,9 +13,12 @@ import {
   Cpu,
   Box,
   PieChart,
-  Database
+  Database,
+  Trash2
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
+import { useState, useEffect } from 'react';
+import { apiUrl } from '../lib/api';
 
 const modules = [
   { 
@@ -84,14 +87,42 @@ const modules = [
   },
 ];
 
-const recentCalculations = [
-  { id: 1, name: 'Shaft Design - Project X', date: '2 hours ago', type: 'Torsion' },
-  { id: 2, name: 'Support Beam Analysis', date: '5 hours ago', type: 'Beams' },
-  { id: 3, name: 'Material Selection - Drone Frame', date: 'Yesterday', type: 'Ashby' },
-];
-
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [recentCalculations, setRecentCalculations] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchRecentCalculations();
+  }, []);
+
+  const fetchRecentCalculations = async () => {
+    try {
+      const response = await fetch(apiUrl('/api/recent-calculations'));
+      const data = await response.json();
+      setRecentCalculations(data);
+    } catch (e) {
+      console.error('Error fetching recent calculations:', e);
+    }
+  };
+
+  const clearCalculations = async () => {
+    if (!confirm('Clear all archives?')) return;
+    try {
+      await fetch(apiUrl('/api/clear-calculations'), { method: 'DELETE' });
+      setRecentCalculations([]);
+    } catch (e) {
+      console.error('Error clearing:', e);
+    }
+  };
+
+  const deleteCalculation = async (id: string) => {
+    try {
+      await fetch(apiUrl(`/api/delete-calculation/${id}`), { method: 'DELETE' });
+      setRecentCalculations(prev => prev.filter(c => c.id !== id));
+    } catch (e) {
+      console.error('Error deleting:', e);
+    }
+  };
 
   return (
     <MainLayout>
@@ -134,7 +165,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
           {[
             { label: 'Safety Status', value: 'All Systems Nominal', icon: ShieldCheck, color: 'text-emerald-400' },
-            { label: 'Active Projects', value: '12 Calculations', icon: Box, color: 'text-primary' },
+            { label: 'Active Projects', value: `${recentCalculations.length} Saved States`, icon: Box, color: 'text-primary' },
             { label: 'Material DB', value: '450+ Alloys', icon: Star, color: 'text-amber-400' }
           ].map((stat) => (
             <div key={stat.label} className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] flex items-center gap-6">
@@ -188,25 +219,52 @@ export default function Dashboard() {
             <div className="p-6 md:p-8 border-b border-outline/5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <History className="w-5 h-5 text-on-surface-variant" />
-                <h3 className="text-base md:text-lg font-bold text-on-surface">Recent Calculations</h3>
+                <h3 className="text-base md:text-lg font-bold text-on-surface">Calculation Archives</h3>
               </div>
-              <button className="label-sm text-on-surface-variant hover:text-on-surface">Clear</button>
+              <button 
+                onClick={clearCalculations}
+                className="label-sm text-on-surface-variant hover:text-on-surface font-bold tracking-widest uppercase"
+              >
+                Clear
+              </button>
             </div>
             <div className="divide-y divide-outline/5">
-              {recentCalculations.map((calc) => (
-                <div key={calc.id} className="p-4 md:p-6 hover:bg-surface-container-high transition-colors flex items-center justify-between group cursor-pointer">
-                  <div className="flex items-center gap-4 md:gap-5">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
-                      <FileTextIcon className="w-5 h-5 md:w-6 md:h-6" />
+              {recentCalculations.length === 0 ? (
+                <div className="p-12 text-center text-on-surface-variant italic">
+                  No calculations archived. Start analyzing modules to save history.
+                </div>
+              ) : (
+                recentCalculations.map((calc) => (
+                  <div 
+                    key={calc.id} 
+                    onClick={() => navigate(`${calc.module}?loadId=${calc.id}`)}
+                    className="p-4 md:p-6 hover:bg-surface-container-high transition-colors flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-4 md:gap-5">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
+                        <FileTextIcon className="w-5 h-5 md:w-6 md:h-6" />
+                      </div>
+                      <div>
+                        <p className="text-sm md:text-base font-bold text-on-surface">{calc.name}</p>
+                        <p className="text-[10px] md:text-xs text-on-surface-variant mt-1">{calc.type} • {calc.timestamp}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm md:text-base font-bold text-on-surface">{calc.name}</p>
-                      <p className="text-[10px] md:text-xs text-on-surface-variant mt-1">{calc.type} • {calc.date}</p>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteCalculation(calc.id);
+                        }}
+                        className="p-2 text-on-surface-variant hover:text-error transition-colors md:opacity-0 group-hover:opacity-100"
+                        title="Delete calculation"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-on-surface-variant group-hover:text-primary group-hover:translate-x-1 transition-all" />
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5 text-on-surface-variant group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 

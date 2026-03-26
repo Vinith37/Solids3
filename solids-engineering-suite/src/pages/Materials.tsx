@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -9,8 +9,9 @@ import {
   Share2,
   Table as TableIcon
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 
 interface Material {
   name: string;
@@ -23,40 +24,74 @@ interface Material {
   cost: number; // $/kg
 }
 
-const materialData: Material[] = [
-  { name: 'Steel (AISI 1020)', category: 'Metals', density: 7850, modulus: 200, strength: 350, poisson: 0.29, thermalExpansion: 11.7, cost: 0.8 },
-  { name: 'Steel (AISI 4140)', category: 'Metals', density: 7850, modulus: 205, strength: 655, poisson: 0.29, thermalExpansion: 12.3, cost: 1.2 },
-  { name: 'Aluminum (6061-T6)', category: 'Metals', density: 2700, modulus: 70, strength: 270, poisson: 0.33, thermalExpansion: 23.6, cost: 2.5 },
-  { name: 'Aluminum (7075-T6)', category: 'Metals', density: 2810, modulus: 71, strength: 503, poisson: 0.33, thermalExpansion: 23.2, cost: 4.5 },
-  { name: 'Titanium (Ti-6Al-4V)', category: 'Metals', density: 4430, modulus: 114, strength: 880, poisson: 0.34, thermalExpansion: 8.6, cost: 30 },
-  { name: 'Copper (C11000)', category: 'Metals', density: 8960, modulus: 115, strength: 220, poisson: 0.34, thermalExpansion: 16.9, cost: 8 },
-  { name: 'CFRP (High Modulus)', category: 'Composites', density: 1600, modulus: 200, strength: 1200, poisson: 0.3, thermalExpansion: -0.5, cost: 80 },
-  { name: 'GFRP (E-glass)', category: 'Composites', density: 2000, modulus: 45, strength: 1000, poisson: 0.25, thermalExpansion: 6, cost: 15 },
-  { name: 'Polycarbonate', category: 'Polymers', density: 1200, modulus: 2.4, strength: 70, poisson: 0.37, thermalExpansion: 65, cost: 4 },
-  { name: 'ABS', category: 'Polymers', density: 1050, modulus: 2.3, strength: 40, poisson: 0.35, thermalExpansion: 90, cost: 2 },
-  { name: 'Silicon Carbide', category: 'Ceramics', density: 3100, modulus: 450, strength: 600, poisson: 0.14, thermalExpansion: 4, cost: 50 },
-  { name: 'Alumina', category: 'Ceramics', density: 3900, modulus: 380, strength: 300, poisson: 0.22, thermalExpansion: 8.1, cost: 20 },
-];
-
 export default function Materials() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [materialData, setMaterialData] = useState<Material[]>([]);
+  const [categories, setCategories] = useState<string[]>(['All']);
 
-  const filteredData = useMemo(() => {
-    return materialData.filter(m => 
-      (category === 'All' || m.category === category) &&
-      (m.name.toLowerCase().includes(search.toLowerCase()) ||
-       m.category.toLowerCase().includes(search.toLowerCase()))
-    );
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setSearch(data.state.search || '');
+            setCategory(data.state.category || 'All');
+          }
+        });
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/material-categories'))
+      .then(res => res.json())
+      .then(data => setCategories(data));
+  }, []);
+
+  useEffect(() => {
+    const fetchMaterials = async () => {
+      try {
+        const response = await fetch(apiUrl(`/api/materials?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`));
+        if (response.ok) {
+          const data = await response.json();
+          setMaterialData(data);
+        }
+      } catch (err) {
+        console.error("Fetch materials failed:", err);
+      }
+    };
+    fetchMaterials();
   }, [search, category]);
 
-  const categories = ['All', ...Array.from(new Set(materialData.map(m => m.category)))];
+  const saveState = async () => {
+    const name = prompt("Name this selection:", `Material Search ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Materials",
+          module: "/materials",
+          state: { search, category }
+        })
+      });
+      alert("Selection archived!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
   return (
     <MainLayout>
       <div className="space-y-12 pb-20">
-        {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
           <div className="max-w-2xl">
             <button 
@@ -70,7 +105,10 @@ export default function Materials() {
             <p className="body-md text-on-surface-variant">Comprehensive database of engineering materials and their mechanical properties for precise structural analysis.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save Selection
             </button>
@@ -106,7 +144,7 @@ export default function Materials() {
             </div>
             <div className="flex items-center gap-3 text-on-surface-variant label-sm">
               <Database className="w-5 h-5 text-primary" />
-              {filteredData.length} Materials Found
+              {materialData.length} Materials Found
             </div>
           </div>
 
@@ -125,7 +163,7 @@ export default function Materials() {
                 </tr>
               </thead>
               <tbody>
-                {filteredData.map((m, idx) => (
+                {materialData.map((m, idx) => (
                   <tr key={m.name} className="hover:bg-surface-container-highest/20 transition-colors group">
                     <td className="px-6 md:px-8 py-4 md:py-6 body-sm md:body-md font-bold text-on-surface border-b border-outline/5">{m.name}</td>
                     <td className="px-6 md:px-8 py-4 md:py-6 border-b border-outline/5">

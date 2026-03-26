@@ -9,8 +9,9 @@ import {
   ShieldCheck,
   Activity
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -29,10 +30,30 @@ export default function Fatigue() {
     isSafe: true
   });
 
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setSu(data.state.su);
+            setSy(data.state.sy);
+            setSe(data.state.se);
+            setSigmaA(data.state.sa);
+            setSigmaM(data.state.sm);
+          }
+        });
+    }
+  }, [location.search]);
+
   useEffect(() => {
     async function executePythonBackend() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/fatigue", {
+        const response = await fetch(apiUrl('/api/fatigue'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -53,6 +74,27 @@ export default function Fatigue() {
     }
     executePythonBackend();
   }, [su, sy, se, sigmaA, sigmaM]);
+
+  const saveState = async () => {
+    const name = prompt("Name this calculation:", `Fatigue Analysis ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Fatigue",
+          module: "/fatigue",
+          state: { su, sy, se, sa: sigmaA, sm: sigmaM }
+        })
+      });
+      alert("Archived successfully!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
   // SVG Plotting constants
   const svgSize = 600;
@@ -109,7 +151,10 @@ export default function Fatigue() {
             <p className="body-md text-on-surface-variant">Predict fatigue life under fluctuating loads using standard criteria and visualization of safety envelopes natively verified by our Python computational engine.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save State
             </button>

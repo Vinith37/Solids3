@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Calculator, 
@@ -23,6 +23,7 @@ import {
   ReferenceLine
 } from 'recharts';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -50,6 +51,27 @@ export default function Beams() {
   const [supportB, setSupportB] = useState<number>(10);
   const [draggingSupport, setDraggingSupport] = useState<'A' | 'B' | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setLength(data.state.length);
+            setModulus(data.state.modulus);
+            setInertia(data.state.inertia);
+            setBeamType(data.state.beamType);
+            setSupportA(data.state.supportA);
+            setSupportB(data.state.supportB);
+            setLoads(data.state.loads);
+          }
+        });
+    }
+  }, [location.search]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggingSupport || !svgRef.current) return;
@@ -106,7 +128,7 @@ export default function Beams() {
            return;
         }
 
-        const response = await fetch("http://127.0.0.1:8000/api/beams", {
+        const response = await fetch(apiUrl('/api/beams'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -130,6 +152,27 @@ export default function Beams() {
     executePythonBackend();
   }, [length, modulus, inertia, beamType, supportA, supportB, loads]);
 
+  const saveState = async () => {
+    const name = prompt("Name this calculation:", `Beam Analysis ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Beams",
+          module: "/beams",
+          state: { length, modulus, inertia, beamType, supportA, supportB, loads }
+        })
+      });
+      alert("Archived successfully!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
+
   if (!analysis) return null; // Wait for consistent state
 
   return (
@@ -149,7 +192,10 @@ export default function Beams() {
             <p className="body-md text-on-surface-variant">Analyze shear force and bending moment for simply supported beams with multiple point loads.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save State
             </button>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -9,47 +9,83 @@ import {
   Zap,
   Waves
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 
 export default function DynamicLoading() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mass, setMass] = useState<number>(10); // kg
   const [height, setHeight] = useState<number>(0.5); // m
   const [stiffness, setStiffness] = useState<number>(10000); // N/m
   
-  const results = useMemo(() => {
-    const g = 9.81;
-    const W = mass * g;
-    const k = stiffness;
-    const h = height;
+  const [results, setResults] = useState({
+    deltaSt: 0,
+    impactFactor: 2,
+    dynamicForce: 0,
+    fn: 0
+  });
 
-    // Static deflection
-    const deltaSt = W / k;
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setMass(data.state.mass);
+            setHeight(data.state.height);
+            setStiffness(data.state.stiffness);
+          }
+        });
+    }
+  }, [location.search]);
 
-    // Impact Factor (n_i)
-    // n_i = 1 + sqrt(1 + 2h/delta_st)
-    const impactFactor = 1 + Math.sqrt(1 + (2 * h) / deltaSt);
-    
-    // Dynamic Force
-    const dynamicForce = W * impactFactor;
-
-    // Natural Frequency (f_n)
-    const omegaN = Math.sqrt(k / mass);
-    const fn = omegaN / (2 * Math.PI);
-
-    return {
-      deltaSt: deltaSt * 1000, // mm
-      impactFactor,
-      dynamicForce,
-      fn
-    };
+  useEffect(() => {
+    async function executePythonBackend() {
+      try {
+        const response = await fetch(apiUrl('/api/dynamic-loading'), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mass, height, stiffness })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data);
+        }
+      } catch (err) {
+        console.error("Python Backend Math Verification Failed:", err);
+      }
+    }
+    executePythonBackend();
   }, [mass, height, stiffness]);
+
+  const saveState = async () => {
+    const name = prompt("Name this calculation:", `Dynamic Loading ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Dynamic Loading",
+          module: "/dynamic",
+          state: { mass, height, stiffness }
+        })
+      });
+      alert("Archived successfully!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
   return (
     <MainLayout>
       <div className="space-y-12 pb-20">
-        {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
           <div className="max-w-2xl">
             <button 
@@ -63,7 +99,10 @@ export default function DynamicLoading() {
             <p className="body-md text-on-surface-variant">Analyze impact stresses and natural vibration frequencies for dynamic structural integrity.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save State
             </button>
@@ -75,7 +114,6 @@ export default function DynamicLoading() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-          {/* Inputs Panel */}
           <div className="lg:col-span-1 space-y-6 lg:space-y-8">
             <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] ambient-shadow">
               <h3 className="label-sm text-primary mb-6 md:mb-8 flex items-center gap-2">
@@ -126,7 +164,6 @@ export default function DynamicLoading() {
             </div>
           </div>
 
-          {/* Results Panel */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] ambient-shadow min-h-[400px] md:min-h-[500px] flex flex-col relative overflow-hidden">
               <div className="absolute inset-0 bg-engineering-pattern opacity-10 pointer-events-none" />
@@ -159,14 +196,15 @@ export default function DynamicLoading() {
                   <div className="relative w-40 h-40 md:w-64 md:h-64 bg-surface-container-highest rounded-full flex items-center justify-center ambient-shadow overflow-hidden group">
                     <div className="absolute inset-0 opacity-20 bg-engineering-pattern" />
                     <motion.div 
+                      key={results.fn}
                       animate={{ 
                         y: [0, -20, 0],
                         scale: [1, 1.1, 1]
                       }}
                       transition={{ 
-                        duration: Math.max(0.1, 1 / results.fn), 
+                        duration: results.fn > 0 ? Math.max(0.05, 1 / results.fn) : 1, 
                         repeat: Infinity,
-                        ease: "easeInOut"
+                        ease: "linear"
                       }}
                       className="relative z-10"
                     >

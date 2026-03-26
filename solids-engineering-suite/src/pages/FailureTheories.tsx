@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calculator, Info, Save, Share2, Target, Hash } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -23,10 +24,29 @@ export default function FailureTheories() {
     isSafe: true
   });
 
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setSigmaX(data.state.sigmaX);
+            setSigmaY(data.state.sigmaY);
+            setTauXY(data.state.tauXY);
+            setSy(data.state.sy);
+          }
+        });
+    }
+  }, [location.search]);
+
   useEffect(() => {
     async function executePythonBackend() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/failure-theories", {
+        const response = await fetch(apiUrl('/api/failure-theories'), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sigmaX, sigmaY, tauXY, sy })
@@ -49,6 +69,27 @@ export default function FailureTheories() {
     }
     executePythonBackend();
   }, [sigmaX, sigmaY, tauXY, sy]);
+
+  const saveState = async () => {
+    const name = prompt("Name this calculation:", `Failure Analysis ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Failure Theories",
+          module: "/failure-theories",
+          state: { sigmaX, sigmaY, tauXY, sy }
+        })
+      });
+      alert("Archived successfully!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
 
   // SVG Plotting constants
   const svgSize = 400;
@@ -112,7 +153,10 @@ export default function FailureTheories() {
             <p className="body-md text-on-surface-variant">Analyze 2D stress states against standard failure criteria (Von Mises, Tresca, Rankine) securely processed through python integration.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
               Save State
             </button>
@@ -200,8 +244,8 @@ export default function FailureTheories() {
                   <div className="absolute inset-0 opacity-10 pointer-events-none bg-engineering-grid" />
                   <svg viewBox={`0 0 ${svgSize} ${svgSize}`} className="w-full h-full">
                     {/* Axes */}
-                    <line x1="0" y1={center} x2={svgSize} y2={center} stroke="var(--color-outline)" strokeWidth="1" opacity="0.2" />
-                    <line x1={center} y1="0" x2={center} y2={svgSize} stroke="var(--color-outline)" strokeWidth="1" opacity="0.2" />
+                    <line x1="0" y1={center} x2={svgSize} y2={center} stroke="black" strokeWidth="2.5" />
+                    <line x1={center} y1="0" x2={center} y2={svgSize} stroke="black" strokeWidth="2.5" />
                     {/* Axis Labels are moved below the envelopes to render on top! */}
 
                     {/* Rankine Envelope */}
@@ -262,6 +306,69 @@ export default function FailureTheories() {
               </div>
 
             </div>
+          </div>
+        </div>
+
+        {/* Detailed Calculation Section */}
+        <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] mt-4 lg:mt-8 ambient-shadow relative overflow-hidden">
+          <h3 className="text-xl md:headline-sm text-on-surface mb-6 md:mb-8 flex items-center gap-3 relative z-10"><Hash className="w-6 h-6 text-primary" />Detailed Calculation Steps</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative z-10">
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5">
+                <h4 className="label-lg text-primary mb-4">1. Principal Stress Determination</h4>
+                <div className="overflow-x-auto text-on-surface pb-2">
+                  <BlockMath math={`\\sigma_{1,2} = \\frac{\\sigma_x + \\sigma_y}{2} \\pm \\sqrt{\\left(\\frac{\\sigma_x - \\sigma_y}{2}\\right)^2 + \\tau_{xy}^2}`} />
+                  <BlockMath math={`\\sigma_{1,2} = \\frac{${sigmaX} + ${sigmaY}}{2} \\pm \\sqrt{\\left(\\frac{${sigmaX} - ${sigmaY}}{2}\\right)^2 + (${tauXY})^2}`} />
+                  <BlockMath math={`\\sigma_1 = ${sigma1.toFixed(2)} \\text{ MPa}, \\quad \\sigma_2 = ${sigma2.toFixed(2)} \\text{ MPa}`} />
+                </div>
+              </div>
+              
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5">
+                <h4 className="label-lg text-primary mb-4">2. Von Mises Stress Theory</h4>
+                <p className="body-sm text-on-surface-variant mb-4 font-bold uppercase tracking-widest text-[10px]">Distortion Energy Criterion</p>
+                <div className="overflow-x-auto text-on-surface pb-2">
+                  <BlockMath math={`\\sigma' = \\sqrt{\\sigma_1^2 - \\sigma_1\\sigma_2 + \\sigma_2^2}`} />
+                  <BlockMath math={`\\sigma' = \\sqrt{(${sigma1.toFixed(2)})^2 - (${sigma1.toFixed(2)})(${sigma2.toFixed(2)}) + (${sigma2.toFixed(2)})^2}`} />
+                  <BlockMath math={`\\sigma' = ${results.vonMisesStress.toFixed(2)} \\text{ MPa} \\implies n_{VM} = \\frac{S_y}{\\sigma'} = ${results.nVonMises.toFixed(2)}`} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">3. Comparative Failure Criteria Analysis</h4>
+                <div className="space-y-8">
+                  <div>
+                    <p className="body-sm text-on-surface-variant mb-2 font-bold uppercase tracking-widest text-[10px]">Tresca (Maximum Shear Stress)</p>
+                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                      <BlockMath math={`\\tau_{max} = \\text{max}\\left(|\\sigma_1-\\sigma_2|/2, |\\sigma_1|/2, |\\sigma_2|/2\\right)`} />
+                      <BlockMath math={`n_{Tresca} = \\frac{S_y/2}{\\tau_{max}} = ${results.nTresca.toFixed(2)}`} />
+                    </div>
+                  </div>
+                  <hr className="border-outline/10" />
+                  <div>
+                    <p className="body-sm text-on-surface-variant mb-2 font-bold uppercase tracking-widest text-[10px]">Rankine (Maximum Normal Stress)</p>
+                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                      <BlockMath math={`\\sigma_{limit} = \\text{max}(|\\sigma_1|, |\\sigma_2|)`} />
+                      <BlockMath math={`n_{Rankine} = \\frac{S_y}{\\sigma_{limit}} = ${results.nRankine.toFixed(2)}`} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+          <div onClick={saveState} className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] hover:bg-surface-container-high transition-colors cursor-pointer group"><Save className="w-8 h-8 md:w-10 md:h-10 text-primary mb-4 md:mb-6" /><h4 className="text-base md:text-lg font-bold text-on-surface mb-2">Save Snapshot</h4><p className="body-md text-on-surface-variant leading-relaxed">Persist current analysis configuration to the project history.</p></div>
+          <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] hover:bg-surface-container-high transition-colors cursor-pointer"><Share2 className="w-8 h-8 md:w-10 md:h-10 text-on-surface-variant mb-4 md:mb-6" /><h4 className="text-base md:text-lg font-bold text-on-surface mb-2">Export Vector</h4><p className="body-md text-on-surface-variant leading-relaxed">Download current safety plot as high-fidelity SVG or PDF.</p></div>
+          <div className="sm:col-span-2 bg-surface-container-high p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] relative overflow-hidden flex items-center justify-between group cursor-pointer transition-all hover:bg-surface-container-highest">
+            <div className="relative z-10">
+              <h4 className="text-lg md:text-xl font-bold text-on-surface mb-2">Detailed Fatigue Prediction</h4>
+              <p className="body-md text-on-surface-variant mb-4">Extend this analysis to cyclic loading margins.</p>
+              <button onClick={() => navigate('/fatigue')} className="flex items-center gap-2 text-primary font-bold label-sm">LAUNCH FATIGUE ENGINE <ArrowLeft className="w-4 h-4 rotate-180" /></button>
+            </div>
+            <Target className="w-20 h-20 text-primary opacity-10 group-hover:scale-110 transition-transform" />
           </div>
         </div>
       </div>

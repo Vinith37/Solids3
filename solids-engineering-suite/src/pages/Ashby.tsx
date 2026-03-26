@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
   Search, 
-  Filter, 
+  Wind, 
   Info, 
   Save, 
   Share2,
-  Database
+  Maximize2,
+  Filter
 } from 'lucide-react';
 import { 
   ScatterChart, 
@@ -18,9 +19,12 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
+  Label,
   Cell
 } from 'recharts';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
+import { apiUrl } from '../lib/api';
 
 interface Material {
   name: string;
@@ -28,53 +32,99 @@ interface Material {
   density: number; // kg/m^3
   modulus: number; // GPa
   strength: number; // MPa
+  poisson: number;
+  thermalExpansion: number; // 10^-6/K
   cost: number; // $/kg
 }
 
-const materialData: Material[] = [
-  { name: 'Steel (AISI 1020)', category: 'Metals', density: 7850, modulus: 200, strength: 350, cost: 0.8 },
-  { name: 'Aluminum (6061-T6)', category: 'Metals', density: 2700, modulus: 70, strength: 270, cost: 2.5 },
-  { name: 'Titanium (Ti-6Al-4V)', category: 'Metals', density: 4430, modulus: 114, strength: 880, cost: 30 },
-  { name: 'CFRP (High Modulus)', category: 'Composites', density: 1600, modulus: 200, strength: 1200, cost: 80 },
-  { name: 'GFRP (E-glass)', category: 'Composites', density: 2000, modulus: 45, strength: 1000, cost: 15 },
-  { name: 'Polycarbonate', category: 'Polymers', density: 1200, modulus: 2.4, strength: 70, cost: 4 },
-  { name: 'ABS', category: 'Polymers', density: 1050, modulus: 2.3, strength: 40, cost: 2 },
-  { name: 'Oak Wood', category: 'Natural', density: 750, modulus: 12, strength: 50, cost: 1.5 },
-  { name: 'Balsa Wood', category: 'Natural', density: 150, modulus: 3, strength: 10, cost: 10 },
-  { name: 'Silicon Carbide', category: 'Ceramics', density: 3100, modulus: 450, strength: 600, cost: 50 },
-  { name: 'Alumina', category: 'Ceramics', density: 3900, modulus: 380, strength: 300, cost: 20 },
+const axisOptions = [
+  { label: 'Modulus (GPa)', value: 'modulus' },
+  { label: 'Strength (MPa)', value: 'strength' },
+  { label: 'Density (kg/m³)', value: 'density' },
+  { label: 'Cost ($/kg)', value: 'cost' },
+  { label: 'CTE (10⁻⁶/K)', value: 'thermalExpansion' }
 ];
 
 export default function Ashby() {
   const navigate = useNavigate();
-  const [xAxis, setXAxis] = useState<keyof Material>('density');
-  const [yAxis, setYAxis] = useState<keyof Material>('modulus');
+  const location = useLocation();
+  const [xAxis, setXAxis] = useState('modulus');
+  const [yAxis, setYAxis] = useState('strength');
   const [search, setSearch] = useState('');
+  const [materialData, setMaterialData] = useState<Material[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const id = params.get('loadId');
+    if (id) {
+      fetch(apiUrl(`/api/load-calculation/${id}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.state) {
+            setXAxis(data.state.xAxis || 'modulus');
+            setYAxis(data.state.yAxis || 'strength');
+            setSearch(data.state.search || '');
+          }
+        });
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    fetch(apiUrl('/api/materials'))
+      .then(res => res.json())
+      .then(data => setMaterialData(data));
+  }, []);
 
   const filteredData = useMemo(() => {
     return materialData.filter(m => 
       m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.category.toLowerCase().includes(search.toLowerCase())
-    ).map(m => ({
-      ...m,
-      x: m[xAxis],
-      y: m[yAxis]
-    }));
-  }, [search, xAxis, yAxis]);
+    );
+  }, [materialData, search]);
 
-  const categories = Array.from(new Set(materialData.map(m => m.category)));
-  const colors: Record<string, string> = {
-    'Metals': 'var(--color-primary)',
-    'Composites': 'var(--color-secondary)',
-    'Polymers': 'var(--color-tertiary)',
-    'Natural': 'var(--color-on-surface-variant)',
-    'Ceramics': 'var(--color-error)'
+  const chartData = useMemo(() => {
+    return filteredData.map(m => ({
+      ...m,
+      x: m[xAxis as keyof Material],
+      y: m[yAxis as keyof Material],
+    }));
+  }, [filteredData, xAxis, yAxis]);
+
+  const saveState = async () => {
+    const name = prompt("Name this chart view:", `Ashby Chart ${new Date().toLocaleTimeString()}`);
+    if (!name) return;
+
+    try {
+      await fetch(apiUrl('/api/save-calculation'), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          type: "Ashby Chart",
+          module: "/ashby",
+          state: { xAxis, yAxis, search }
+        })
+      });
+      alert("Chart archived!");
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch(category) {
+      case 'Metals': return 'var(--color-primary)';
+      case 'Polymers': return 'var(--color-secondary)';
+      case 'Composites': return 'var(--color-tertiary)';
+      case 'Ceramics': return 'var(--color-error)';
+      case 'Natural': return 'var(--color-success)';
+      default: return 'var(--color-on-surface-variant)';
+    }
   };
 
   return (
     <MainLayout>
       <div className="space-y-12 pb-20">
-        {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
           <div className="max-w-2xl">
             <button 
@@ -85,155 +135,146 @@ export default function Ashby() {
               Back to Dashboard
             </button>
             <h1 className="display-lg text-on-surface mb-4">Ashby Material Chart</h1>
-            <p className="body-md text-on-surface-variant">Select optimal materials based on performance indices and property trade-offs using log-log visualization.</p>
+            <p className="body-md text-on-surface-variant">Multi-objective material selection using standard performance indices and property trade-off visualization.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
-            <button className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={saveState}
+              className="w-full sm:w-auto px-6 py-3 bg-surface-container-high text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all flex items-center justify-center gap-2"
+            >
               <Save className="w-4 h-4" />
-              Save Selection
+              Save View
             </button>
             <button className="w-full sm:w-auto px-6 py-3 primary-gradient text-on-primary rounded-full font-bold hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg">
               <Share2 className="w-4 h-4" />
-              Export Data
+              Export Chart
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          {/* Controls Panel */}
           <div className="lg:col-span-3 space-y-6 lg:space-y-8">
-            <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem]">
+            <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] ambient-shadow">
               <h3 className="label-sm text-primary mb-6 md:mb-8 flex items-center gap-2">
                 <Filter className="w-5 h-5" />
-                Chart Controls
+                Axis Selection
               </h3>
               
               <div className="space-y-6">
                 <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">X-Axis Property</label>
+                  <label className="label-sm text-on-surface-variant block mb-3 text-[10px] tracking-widest uppercase font-bold">X-Axis Property</label>
                   <select 
                     value={xAxis}
-                    onChange={(e) => setXAxis(e.target.value as keyof Material)}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
+                    onChange={(e) => setXAxis(e.target.value)}
+                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
                   >
-                    <option value="density">Density (kg/m³)</option>
-                    <option value="modulus">Young's Modulus (GPa)</option>
-                    <option value="strength">Yield Strength (MPa)</option>
-                    <option value="cost">Cost ($/kg)</option>
+                    {axisOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">Y-Axis Property</label>
+                  <label className="label-sm text-on-surface-variant block mb-3 text-[10px] tracking-widest uppercase font-bold">Y-Axis Property</label>
                   <select 
                     value={yAxis}
-                    onChange={(e) => setYAxis(e.target.value as keyof Material)}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
+                    onChange={(e) => setYAxis(e.target.value)}
+                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
                   >
-                    <option value="modulus">Young's Modulus (GPa)</option>
-                    <option value="density">Density (kg/m³)</option>
-                    <option value="strength">Yield Strength (MPa)</option>
-                    <option value="cost">Cost ($/kg)</option>
+                    {axisOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                   </select>
                 </div>
-                <div className="pt-4">
-                  <div className="relative group">
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant group-focus-within:text-primary transition-colors" />
-                    <input 
-                      type="text" 
-                      placeholder="Search materials..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-full pl-14 pr-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all"
-                    />
-                  </div>
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant group-focus-within:text-primary transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="Search materials..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-surface-container-highest rounded-2xl outline-none font-sans text-sm text-on-surface focus:ring-2 ring-primary/20 transition-all"
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem]">
-              <h3 className="label-sm text-on-surface-variant mb-6 flex items-center gap-2">
-                <Database className="w-5 h-5" />
-                Categories
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-4">
-                {categories.map(cat => (
-                  <div key={cat} className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colors[cat] }}></span>
-                    <span className="label-sm text-on-surface truncate">{cat}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="bg-surface-container-low p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] ambient-shadow">
+               <h3 className="label-sm text-on-surface-variant mb-6 uppercase tracking-widest">Legend</h3>
+               <div className="space-y-4">
+                 {[
+                   { name: 'Metals', color: 'bg-primary' },
+                   { name: 'Polymers', color: 'bg-secondary' },
+                   { name: 'Composites', color: 'bg-tertiary' },
+                   { name: 'Ceramics', color: 'bg-error' },
+                   { name: 'Natural', color: 'bg-success' }
+                 ].map(cat => (
+                   <div key={cat.name} className="flex items-center gap-3">
+                     <span className={`w-3 h-3 rounded-full ${cat.color}`} />
+                     <span className="label-sm text-on-surface">{cat.name}</span>
+                   </div>
+                 ))}
+               </div>
             </div>
           </div>
 
-          {/* Chart Panel */}
-          <div className="lg:col-span-9 space-y-8">
-            <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] min-h-[400px] md:min-h-[700px] flex flex-col relative overflow-hidden">
-              <div className="absolute inset-0 bg-engineering-dots opacity-5 pointer-events-none" />
-              
-              <div className="flex-1 relative z-10 bg-surface-container-lowest rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-8 ambient-shadow">
+          <div className="lg:col-span-9">
+            <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] ambient-shadow h-[500px] md:h-[650px] flex flex-col">
+              <div className="flex justify-between items-center mb-10">
+                <div className="flex items-center gap-4">
+                  <Maximize2 className="w-5 h-5 text-primary" />
+                  <h3 className="text-xl md:headline-sm text-on-surface">Property Map</h3>
+                </div>
+              </div>
+
+              <div className="flex-1 w-full relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline)" opacity={0.1} />
                     <XAxis 
                       type="number" 
                       dataKey="x" 
                       name={xAxis} 
+                      stroke="black" 
+                      strokeWidth={2}
                       scale="log" 
                       domain={['auto', 'auto']}
-                      stroke="var(--color-on-surface-variant)"
-                      fontSize={10}
-                      label={{ value: xAxis.toUpperCase(), position: 'bottom', offset: 0, fontSize: 10, fontWeight: '700', fill: 'var(--color-on-surface-variant)', className: 'label-sm' }}
-                    />
+                      tick={{ fontSize: 12, fontWeight: 700 }}
+                    >
+                      <Label value={axisOptions.find(o=>o.value===xAxis)?.label} position="bottom" offset={20} className="label-sm font-bold fill-on-surface" />
+                    </XAxis>
                     <YAxis 
                       type="number" 
                       dataKey="y" 
                       name={yAxis} 
+                      stroke="black" 
+                      strokeWidth={2}
                       scale="log" 
                       domain={['auto', 'auto']}
-                      stroke="var(--color-on-surface-variant)"
-                      fontSize={10}
-                      label={{ value: yAxis.toUpperCase(), angle: -90, position: 'left', offset: 0, fontSize: 10, fontWeight: '700', fill: 'var(--color-on-surface-variant)', className: 'label-sm' }}
-                    />
-                    <ZAxis type="number" range={[100, 1000]} />
+                      tick={{ fontSize: 12, fontWeight: 700 }}
+                    >
+                      <Label value={axisOptions.find(o=>o.value===yAxis)?.label} angle={-90} position="left" offset={0} className="label-sm font-bold fill-on-surface" />
+                    </YAxis>
                     <Tooltip 
-                      cursor={{ strokeDasharray: '3 3', stroke: 'var(--color-primary)', strokeWidth: 2 }}
+                      cursor={{ strokeDasharray: '3 3' }} 
+                      contentStyle={{ backgroundColor: 'var(--color-surface-container-highest)', border: 'none', borderRadius: '16px', color: 'var(--color-on-surface)' }}
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
-                          const data = payload[0].payload as Material;
+                          const data = payload[0].payload;
                           return (
-                            <div className="bg-surface-container-high p-4 md:p-6 rounded-2xl border-none shadow-2xl text-on-surface min-w-[180px] md:min-w-[200px]">
-                              <p className="text-lg md:headline-md mb-4">{data.name}</p>
-                              <div className="space-y-2 label-sm text-on-surface-variant">
-                                <p className="flex justify-between gap-4"><span>Density:</span> <span className="text-on-surface font-mono">{data.density} kg/m³</span></p>
-                                <p className="flex justify-between gap-4"><span>Modulus:</span> <span className="text-on-surface font-mono">{data.modulus} GPa</span></p>
-                                <p className="flex justify-between gap-4"><span>Strength:</span> <span className="text-on-surface font-mono">{data.strength} MPa</span></p>
-                                <p className="flex justify-between gap-4"><span>Cost:</span> <span className="text-on-surface font-mono">${data.cost}/kg</span></p>
-                              </div>
+                            <div className="bg-surface-container-highest p-4 rounded-2xl shadow-xl border border-outline/10">
+                              <p className="font-bold text-primary mb-2">{data.name}</p>
+                              <p className="text-xs text-on-surface-variant mb-1">Category: {data.category}</p>
+                              <p className="text-xs text-on-surface-variant">{xAxis}: {data.x}</p>
+                              <p className="text-xs text-on-surface-variant">{yAxis}: {data.y}</p>
                             </div>
                           );
                         }
                         return null;
                       }}
                     />
-                    <Scatter name="Materials" data={filteredData}>
-                      {filteredData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={colors[entry.category]} fillOpacity={0.4} stroke={colors[entry.category]} strokeWidth={3} />
+                    <Scatter data={chartData}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getCategoryColor(entry.category)} />
                       ))}
                     </Scatter>
                   </ScatterChart>
                 </ResponsiveContainer>
-              </div>
-
-              <div className="mt-6 md:mt-10 pt-6 md:pt-10 border-t border-outline/10 relative z-10">
-                <div className="flex gap-4">
-                  <div className="p-2 bg-primary/10 rounded-xl h-fit">
-                    <Info className="w-5 h-5 text-primary shrink-0" />
-                  </div>
-                  <p className="body-sm md:body-md text-on-surface-variant leading-relaxed">
-                    Ashby charts use log-log scales to visualize material property space. Performance indices (e.g., E/ρ) appear as lines of constant slope on these charts, allowing for rapid material selection based on structural efficiency.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
