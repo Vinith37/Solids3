@@ -1,1 +1,1 @@
-[]
+[{"id": "1b75ce3f-5fcc-4eb7-b515-958052f9ef2a", "name": "Failure Analysis 22:00:18", "type": "Failure Theories", "module": "/failure-theories", "timestamp": "2026-04-07 22:00:20", "state": {"sigmaX": 150, "sigmaY": 50, "tauXY": 0, "sy": 250}}, {"id": "5c36edf0-2db0-4c05-899e-1c22d229bf42", "name": "Mohr's Circle 22:01:32", "type": "Mohr's Circle", "module": "/mohr-circle", "timestamp": "2026-04-07 22:01:33", "state": {"is3D": false, "sigmaX": 80, "sigmaY": 20, "sigmaZ": 0, "tauXY": 30}}]

@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { useState, useEffect } from 'react';
-import { apiUrl } from '../lib/api';
+import { calculationService } from '../services/api';
+import type { CalculationSummary } from '../types/api';
 
 const modules = [
   { 
@@ -89,7 +90,7 @@ const modules = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [recentCalculations, setRecentCalculations] = useState<any[]>([]);
+  const [recentCalculations, setRecentCalculations] = useState<CalculationSummary[]>([]);
 
   useEffect(() => {
     fetchRecentCalculations();
@@ -97,8 +98,7 @@ export default function Dashboard() {
 
   const fetchRecentCalculations = async () => {
     try {
-      const response = await fetch(apiUrl('/api/recent-calculations'));
-      const data = await response.json();
+      const data = await calculationService.list();
       setRecentCalculations(data);
     } catch (e) {
       console.error('Error fetching recent calculations:', e);
@@ -108,7 +108,7 @@ export default function Dashboard() {
   const clearCalculations = async () => {
     if (!confirm('Clear all archives?')) return;
     try {
-      await fetch(apiUrl('/api/clear-calculations'), { method: 'DELETE' });
+      await calculationService.clearAll();
       setRecentCalculations([]);
     } catch (e) {
       console.error('Error clearing:', e);
@@ -117,7 +117,7 @@ export default function Dashboard() {
 
   const deleteCalculation = async (id: string) => {
     try {
-      await fetch(apiUrl(`/api/delete-calculation/${id}`), { method: 'DELETE' });
+      await calculationService.delete(id);
       setRecentCalculations(prev => prev.filter(c => c.id !== id));
     } catch (e) {
       console.error('Error deleting:', e);

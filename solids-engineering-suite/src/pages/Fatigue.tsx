@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -9,9 +9,12 @@ import {
   ShieldCheck,
   Activity
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { fatigueService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { FatigueInput, FatigueResult } from '../types/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -23,85 +26,39 @@ export default function Fatigue() {
   const [sigmaA, setSigmaA] = useState<number>(100); // MPa (Alternating)
   const [sigmaM, setSigmaM] = useState<number>(150); // MPa (Mean)
 
-  const [results, setResults] = useState({
-    nG: 1.71,
-    nS: 1.50,
-    nGerber: 2.53,
-    isSafe: true
+  // --- Hooks ---
+  const analysisInput: FatigueInput = { su, sy, se, sa: sigmaA, sm: sigmaM };
+
+  const { result: results } = useAnalysis<FatigueInput, FatigueResult>(
+    fatigueService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ su, sy, se, sa: sigmaA, sm: sigmaM }),
+    [su, sy, se, sigmaA, sigmaM],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Fatigue',
+    module: '/fatigue',
+    getState,
+    onLoad: (state) => {
+      if (state.su !== undefined) setSu(state.su as number);
+      if (state.sy !== undefined) setSy(state.sy as number);
+      if (state.se !== undefined) setSe(state.se as number);
+      if (state.sa !== undefined) setSigmaA(state.sa as number);
+      if (state.sm !== undefined) setSigmaM(state.sm as number);
+    },
   });
 
-  const location = useLocation();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setSu(data.state.su);
-            setSy(data.state.sy);
-            setSe(data.state.se);
-            setSigmaA(data.state.sa);
-            setSigmaM(data.state.sm);
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const response = await fetch(apiUrl('/api/fatigue'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            su, 
-            sy, 
-            se, 
-            sa: sigmaA, 
-            sm: sigmaM 
-          })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setResults(data);
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [su, sy, se, sigmaA, sigmaM]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Fatigue Analysis ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Fatigue",
-          module: "/fatigue",
-          state: { su, sy, se, sa: sigmaA, sm: sigmaM }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
+  const r: FatigueResult = results ?? { nG: 1.71, nS: 1.50, nGerber: 2.53, isSafe: true };
 
   // SVG Plotting constants
   const svgSize = 600;
   
   const maxX = Math.max(su, sy) * 1.2;
   const maxY = Math.max(se, sigmaA) * 1.2;
-  const bound = Math.max(maxX, maxY);
 
   const paddingLeft = 60;
   const paddingBottom = 60;
@@ -244,24 +201,24 @@ export default function Fatigue() {
               
               <div className="w-full flex flex-col xl:flex-row justify-between items-start gap-8 mb-12 relative z-10 p-4">
                 <div className="flex items-center gap-6 md:gap-8">
-                  <div className={`w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center shrink-0 ${results.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                    <span className="text-3xl md:text-5xl font-black">{results.nG.toFixed(2)}</span>
+                  <div className={`w-20 h-20 md:w-28 md:h-28 rounded-full flex items-center justify-center shrink-0 ${r.isSafe ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                    <span className="text-3xl md:text-5xl font-black">{r.nG.toFixed(2)}</span>
                   </div>
                   <div>
                     <h3 className="text-2xl md:text-3xl font-bold text-on-surface">Goodman Safety Factor</h3>
-                    <p className={`label-sm md:label-sm mt-2 font-bold ${results.isSafe ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {results.isSafe ? 'SAFE DESIGN' : 'FATIGUE FAILURE PREDICTED'}
+                    <p className={`label-sm md:label-sm mt-2 font-bold ${r.isSafe ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {r.isSafe ? 'SAFE DESIGN' : 'FATIGUE FAILURE PREDICTED'}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-8 md:gap-12 w-full xl:w-auto justify-between xl:justify-end border-t xl:border-t-0 border-outline/10 pt-6 xl:pt-0">
                   <div className="text-left md:text-right">
                     <p className="label-sm text-on-surface-variant mb-2 font-bold">SODERBERG</p>
-                    <p className="text-2xl md:text-4xl font-light text-on-surface">{results.nS.toFixed(2)}</p>
+                    <p className="text-2xl md:text-4xl font-light text-on-surface">{r.nS.toFixed(2)}</p>
                   </div>
                   <div className="text-left md:text-right">
                     <p className="label-sm text-on-surface-variant mb-2 font-bold">GERBER</p>
-                    <p className="text-2xl md:text-4xl font-light text-on-surface">{results.nGerber.toFixed(2)}</p>
+                    <p className="text-2xl md:text-4xl font-light text-on-surface">{r.nGerber.toFixed(2)}</p>
                   </div>
                 </div>
               </div>
@@ -335,7 +292,7 @@ export default function Fatigue() {
                     <p className="body-sm text-on-surface-variant mb-2">Linear interpolation connecting alternating endurance explicitly targeting ultimate structural strength limits linearly mapping absolute dynamic threshold margins:</p>
                     <div className="overflow-x-auto text-on-surface pb-2 text-sm mt-4">
                       <BlockMath math={`\\frac{\\sigma_a}{S_e} + \\frac{\\sigma_m}{S_u} = \\frac{1}{n_G}`} />
-                      <BlockMath math={`n_G = \\frac{1}{\\frac{${sigmaA}}{${se}} + \\frac{${sigmaM}}{${su}}} = ${results.nG.toFixed(2)}`} />
+                      <BlockMath math={`n_G = \\frac{1}{\\frac{${sigmaA}}{${se}} + \\frac{${sigmaM}}{${su}}} = ${r.nG.toFixed(2)}`} />
                     </div>
                   </div>
                 </div>
@@ -345,7 +302,7 @@ export default function Fatigue() {
                     <p className="body-sm text-on-surface-variant mb-2">A deeply conservative formulation dynamically pivoting static anchor lines onto explicit elastic limits ensuring deformation avoidance over fatigue tolerance:</p>
                     <div className="overflow-x-auto text-on-surface pb-2 text-sm mt-4">
                       <BlockMath math={`\\frac{\\sigma_a}{S_e} + \\frac{\\sigma_m}{S_y} = \\frac{1}{n_S}`} />
-                      <BlockMath math={`n_S = \\frac{1}{\\frac{${sigmaA}}{${se}} + \\frac{${sigmaM}}{${sy}}} = ${results.nS.toFixed(2)}`} />
+                      <BlockMath math={`n_S = \\frac{1}{\\frac{${sigmaA}}{${se}} + \\frac{${sigmaM}}{${sy}}} = ${r.nS.toFixed(2)}`} />
                     </div>
                   </div>
                 </div>
@@ -355,7 +312,7 @@ export default function Fatigue() {
                     <p className="body-sm text-on-surface-variant mb-2">Utilizing advanced empirical correlation fitting quadratic bounds tracking structural endurance curves precisely fitting traditional experimental data plots optimally across high-cycle margins:</p>
                     <div className="overflow-x-auto text-on-surface pb-2 text-sm mt-4">
                       <BlockMath math={`\\frac{n \\cdot \\sigma_a}{S_e} + \\left(\\frac{n \\cdot \\sigma_m}{S_u}\\right)^2 = 1`} />
-                      <BlockMath math={`\\text{Solving bounds quadratically: } n_{Gerber} = ${results.nGerber.toFixed(2)}`} />
+                      <BlockMath math={`\\text{Solving bounds quadratically: } n_{Gerber} = ${r.nGerber.toFixed(2)}`} />
                     </div>
                   </div>
                 </div>

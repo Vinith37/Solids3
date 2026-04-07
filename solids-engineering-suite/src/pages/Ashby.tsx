@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -22,20 +22,12 @@ import {
   Label,
   Cell
 } from 'recharts';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { materialsService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import type { Material } from '../types/api';
 
-interface Material {
-  name: string;
-  category: string;
-  density: number; // kg/m^3
-  modulus: number; // GPa
-  strength: number; // MPa
-  poisson: number;
-  thermalExpansion: number; // 10^-6/K
-  cost: number; // $/kg
-}
 
 const axisOptions = [
   { label: 'Modulus (GPa)', value: 'modulus' },
@@ -47,33 +39,32 @@ const axisOptions = [
 
 export default function Ashby() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [xAxis, setXAxis] = useState('modulus');
   const [yAxis, setYAxis] = useState('strength');
   const [search, setSearch] = useState('');
   const [materialData, setMaterialData] = useState<Material[]>([]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setXAxis(data.state.xAxis || 'modulus');
-            setYAxis(data.state.yAxis || 'strength');
-            setSearch(data.state.search || '');
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    fetch(apiUrl('/api/materials'))
-      .then(res => res.json())
-      .then(data => setMaterialData(data));
+    materialsService.list()
+      .then(data => setMaterialData(data))
+      .catch(err => console.error('[Ashby] Failed to load materials:', err));
   }, []);
+
+  const getState = useCallback(
+    () => ({ xAxis, yAxis, search }),
+    [xAxis, yAxis, search],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Ashby Chart',
+    module: '/ashby',
+    getState,
+    onLoad: (state) => {
+      if (state.xAxis) setXAxis(state.xAxis as string);
+      if (state.yAxis) setYAxis(state.yAxis as string);
+      if (state.search !== undefined) setSearch(state.search as string);
+    },
+  });
 
   const filteredData = useMemo(() => {
     return materialData.filter(m => 
@@ -89,27 +80,6 @@ export default function Ashby() {
       y: m[yAxis as keyof Material],
     }));
   }, [filteredData, xAxis, yAxis]);
-
-  const saveState = async () => {
-    const name = prompt("Name this chart view:", `Ashby Chart ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Ashby Chart",
-          module: "/ashby",
-          state: { xAxis, yAxis, search }
-        })
-      });
-      alert("Chart archived!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
 
   const getCategoryColor = (category: string) => {
     switch(category) {

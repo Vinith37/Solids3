@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calculator, Info, Save, Share2, Zap, Box } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { torsionService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { TorsionInput, TorsionResult } from '../types/api';
 
 type SectionType = 'solid-circular' | 'hollow-circular' | 'rectangular';
 
 export default function Torsion() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [section, setSection] = useState<SectionType>('solid-circular');
   const [torque, setTorque] = useState<number>(500); // Nm
   const [length, setLength] = useState<number>(2); // m
@@ -19,71 +21,35 @@ export default function Torsion() {
   const [d1, setD1] = useState<number>(50); // mm (Outer diameter or width)
   const [d2, setD2] = useState<number>(30); // mm (Inner diameter or height)
 
-  const [results, setResults] = useState({
-    maxShear: 0,
-    angleRad: 0,
-    angleDeg: 0,
-    J: 0
+  // --- Hooks: replaces 3 boilerplate useEffects ---
+  const analysisInput: TorsionInput = { section, torque, length, modulus, d1, d2 };
+
+  const { result: results } = useAnalysis<TorsionInput, TorsionResult>(
+    torsionService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ section, torque, length, modulus, d1, d2 }),
+    [section, torque, length, modulus, d1, d2],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Torsion',
+    module: '/torsion',
+    getState,
+    onLoad: (state) => {
+      if (state.section !== undefined) setSection(state.section as SectionType);
+      if (state.torque !== undefined) setTorque(state.torque as number);
+      if (state.length !== undefined) setLength(state.length as number);
+      if (state.modulus !== undefined) setModulus(state.modulus as number);
+      if (state.d1 !== undefined) setD1(state.d1 as number);
+      if (state.d2 !== undefined) setD2(state.d2 as number);
+    },
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setSection(data.state.section);
-            setTorque(data.state.torque);
-            setLength(data.state.length);
-            setModulus(data.state.modulus);
-            setD1(data.state.d1);
-            setD2(data.state.d2);
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const response = await fetch(apiUrl('/api/torsion'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ section, torque, length, modulus, d1, d2 })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setResults(data);
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [section, torque, length, modulus, d1, d2]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Torsion Analysis ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Torsion",
-          module: "/torsion",
-          state: { section, torque, length, modulus, d1, d2 }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
+  // Fallback defaults while backend hasn't responded yet
+  const r: TorsionResult = results ?? { maxShear: 0, angleRad: 0, angleDeg: 0, J: 0 };
 
   return (
     <MainLayout>
@@ -216,7 +182,7 @@ export default function Torsion() {
                   <div>
                     <p className="label-sm text-on-surface-variant mb-3">Max Shear Stress</p>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-4xl md:text-6xl font-black text-on-surface">{results.maxShear.toFixed(2)}</span>
+                      <span className="text-4xl md:text-6xl font-black text-on-surface">{r.maxShear.toFixed(2)}</span>
                       <span className="text-xl md:text-2xl font-bold text-on-surface-variant">MPa</span>
                     </div>
                   </div>
@@ -224,15 +190,15 @@ export default function Torsion() {
                   <div>
                     <p className="label-sm text-on-surface-variant mb-3">Angle of Twist</p>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-4xl md:text-6xl font-black text-primary">{results.angleDeg.toFixed(3)}</span>
+                      <span className="text-4xl md:text-6xl font-black text-primary">{r.angleDeg.toFixed(3)}</span>
                       <span className="text-xl md:text-2xl font-bold text-on-surface-variant">deg</span>
                     </div>
-                    <p className="label-sm text-on-surface-variant mt-2">({results.angleRad.toFixed(5)} rad)</p>
+                    <p className="label-sm text-on-surface-variant mt-2">({r.angleRad.toFixed(5)} rad)</p>
                   </div>
 
                   <div className="pt-8 border-t border-outline/10">
                     <p className="label-sm text-on-surface-variant mb-2">Polar Moment of Inertia (J)</p>
-                    <p className="text-xl md:headline-md text-on-surface">{results.J.toFixed(4)} cm⁴</p>
+                    <p className="text-xl md:headline-md text-on-surface">{r.J.toFixed(4)} cm⁴</p>
                   </div>
                 </div>
 
@@ -245,11 +211,11 @@ export default function Torsion() {
                         cx="50" cy="50" r="40" 
                         fill="none" stroke="var(--color-primary)" strokeWidth="8"
                         strokeDasharray="251.2"
-                        strokeDashoffset={251.2 * (1 - Math.min(results.angleDeg / 10, 1))}
+                        strokeDashoffset={251.2 * (1 - Math.min(r.angleDeg / 10, 1))}
                         strokeLinecap="round"
                         transform="rotate(-90 50 50)"
                         initial={{ strokeDashoffset: 251.2 }}
-                        animate={{ strokeDashoffset: 251.2 * (1 - Math.min(results.angleDeg / 10, 1)) }}
+                        animate={{ strokeDashoffset: 251.2 * (1 - Math.min(r.angleDeg / 10, 1)) }}
                         transition={{ duration: 1, ease: "easeOut" }}
                       />
                       <Zap className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 md:w-16 md:h-16 text-primary/10" />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -9,79 +9,44 @@ import {
   Zap,
   Waves
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { dynamicService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { DynamicInput, DynamicResult } from '../types/api';
 
 export default function DynamicLoading() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [mass, setMass] = useState<number>(10); // kg
   const [height, setHeight] = useState<number>(0.5); // m
   const [stiffness, setStiffness] = useState<number>(10000); // N/m
-  
-  const [results, setResults] = useState({
-    deltaSt: 0,
-    impactFactor: 2,
-    dynamicForce: 0,
-    fn: 0
+
+  // --- Hooks ---
+  const analysisInput: DynamicInput = { mass, height, stiffness };
+
+  const { result: rawResults } = useAnalysis<DynamicInput, DynamicResult>(
+    dynamicService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ mass, height, stiffness }),
+    [mass, height, stiffness],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Dynamic Loading',
+    module: '/dynamic',
+    getState,
+    onLoad: (state) => {
+      if (state.mass !== undefined) setMass(state.mass as number);
+      if (state.height !== undefined) setHeight(state.height as number);
+      if (state.stiffness !== undefined) setStiffness(state.stiffness as number);
+    },
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setMass(data.state.mass);
-            setHeight(data.state.height);
-            setStiffness(data.state.stiffness);
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const response = await fetch(apiUrl('/api/dynamic-loading'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mass, height, stiffness })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setResults(data);
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [mass, height, stiffness]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Dynamic Loading ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Dynamic Loading",
-          module: "/dynamic",
-          state: { mass, height, stiffness }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
+  const results: DynamicResult = rawResults ?? { deltaSt: 0, impactFactor: 2, dynamicForce: 0, fn: 0 };
 
   return (
     <MainLayout>

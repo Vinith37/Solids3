@@ -1,9 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import MainLayout from './layouts/MainLayout';
-import { motion } from 'motion/react';
-import { ArrowUpRight, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Pages
 import Login from './pages/Login';
@@ -28,26 +26,28 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/failure-theories" element={<PrivateRoute><FailureTheories /></PrivateRoute>} />
-          <Route path="/mohr-circle" element={<PrivateRoute><MohrCircle /></PrivateRoute>} />
-          <Route path="/beams" element={<PrivateRoute><Beams /></PrivateRoute>} />
-          <Route path="/torsion" element={<PrivateRoute><Torsion /></PrivateRoute>} />
-          <Route path="/fatigue" element={<PrivateRoute><Fatigue /></PrivateRoute>} />
-          <Route path="/ashby" element={<PrivateRoute><Ashby /></PrivateRoute>} />
-          <Route path="/dynamic" element={<PrivateRoute><DynamicLoading /></PrivateRoute>} />
-          <Route path="/materials" element={<PrivateRoute><Materials /></PrivateRoute>} />
-          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/failure-theories" element={<PrivateRoute><FailureTheories /></PrivateRoute>} />
+            <Route path="/mohr-circle" element={<PrivateRoute><MohrCircle /></PrivateRoute>} />
+            <Route path="/beams" element={<PrivateRoute><Beams /></PrivateRoute>} />
+            <Route path="/torsion" element={<PrivateRoute><Torsion /></PrivateRoute>} />
+            <Route path="/fatigue" element={<PrivateRoute><Fatigue /></PrivateRoute>} />
+            <Route path="/ashby" element={<PrivateRoute><Ashby /></PrivateRoute>} />
+            <Route path="/dynamic" element={<PrivateRoute><DynamicLoading /></PrivateRoute>} />
+            <Route path="/materials" element={<PrivateRoute><Materials /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }

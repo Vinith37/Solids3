@@ -1,87 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ArrowLeft, RefreshCw, ZoomIn, ZoomOut, Save, FileDown, Plus, Activity, Hash } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { mohrService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { MohrCircleInput, MohrCircleResult } from '../types/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
 export default function MohrCircle() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [is3D, setIs3D] = useState(false);
   const [sigmaX, setSigmaX] = useState<number>(80);
   const [sigmaY, setSigmaY] = useState<number>(20);
   const [sigmaZ, setSigmaZ] = useState<number>(0);
   const [tauXY, setTauXY] = useState<number>(30);
 
-  const [calculations, setCalculations] = useState({
-      avg: 50,
-      radius: 42.43,
-      sigma1: 92.43,
-      sigma2: 7.57,
-      p1: 92.43, p2: 7.57, p3: 0,
-      absMaxShear: 46.21,
-      twoThetaPRad: 0,
-      thetaP: 0
+  // --- Hooks ---
+  const analysisInput: MohrCircleInput = { is3D, sigmaX, sigmaY, sigmaZ, tauXY };
+
+  const { result: rawCalc } = useAnalysis<MohrCircleInput, MohrCircleResult>(
+    mohrService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ is3D, sigmaX, sigmaY, sigmaZ, tauXY }),
+    [is3D, sigmaX, sigmaY, sigmaZ, tauXY],
+  );
+
+  const { saveState } = useCalculation({
+    type: "Mohr's Circle",
+    module: '/mohr-circle',
+    getState,
+    onLoad: (state) => {
+      if (state.is3D !== undefined) setIs3D(state.is3D as boolean);
+      if (state.sigmaX !== undefined) setSigmaX(state.sigmaX as number);
+      if (state.sigmaY !== undefined) setSigmaY(state.sigmaY as number);
+      if (state.sigmaZ !== undefined) setSigmaZ(state.sigmaZ as number);
+      if (state.tauXY !== undefined) setTauXY(state.tauXY as number);
+    },
   });
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setIs3D(data.state.is3D);
-            setSigmaX(data.state.sigmaX);
-            setSigmaY(data.state.sigmaY);
-            setSigmaZ(data.state.sigmaZ);
-            setTauXY(data.state.tauXY);
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const response = await fetch(apiUrl('/api/mohr-circle'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is3D, sigmaX, sigmaY, sigmaZ, tauXY })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setCalculations(data);
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [sigmaX, sigmaY, tauXY, sigmaZ, is3D]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Mohr's Circle ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Mohr's Circle",
-          module: "/mohr-circle",
-          state: { is3D, sigmaX, sigmaY, sigmaZ, tauXY }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
+  const calculations: MohrCircleResult = rawCalc ?? {
+    avg: 50, radius: 42.43, sigma1: 92.43, sigma2: 7.57,
+    p1: 92.43, p2: 7.57, p3: 0,
+    absMaxShear: 46.21, twoThetaPRad: 0, thetaP: 0,
   };
 
   // Dynamic SVG Bound Mapping Logic

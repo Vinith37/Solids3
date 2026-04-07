@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Calculator, 
@@ -23,27 +23,21 @@ import {
   ReferenceLine
 } from 'recharts';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { beamsService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { BeamsInput, BeamsResult, BeamLoadInput } from '../types/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
 type LoadType = 'point' | 'udl' | 'uvl';
-
-interface BeamLoad {
-  id: string;
-  type: LoadType;
-  position: number;
-  length: number;      // For UDL or UVL
-  magnitude: number;   // w1 or P
-  endMagnitude: number;// w2 (for UVL)
-}
 
 export default function Beams() {
   const navigate = useNavigate();
   const [length, setLength] = useState<number>(10);
   const [modulus, setModulus] = useState<number>(200); // GPa
   const [inertia, setInertia] = useState<number>(500); // cm^4
-  const [loads, setLoads] = useState<BeamLoad[]>([
+  const [loads, setLoads] = useState<BeamLoadInput[]>([
     { id: '1', type: 'point', position: 5, length: 0, magnitude: 10, endMagnitude: 10 }
   ]);
   const [beamType, setBeamType] = useState<'simply_supported' | 'cantilever'>('simply_supported');
@@ -51,27 +45,34 @@ export default function Beams() {
   const [supportB, setSupportB] = useState<number>(10);
   const [draggingSupport, setDraggingSupport] = useState<'A' | 'B' | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const location = useLocation();
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setLength(data.state.length);
-            setModulus(data.state.modulus);
-            setInertia(data.state.inertia);
-            setBeamType(data.state.beamType);
-            setSupportA(data.state.supportA);
-            setSupportB(data.state.supportB);
-            setLoads(data.state.loads);
-          }
-        });
-    }
-  }, [location.search]);
+  // --- Hooks ---
+  const analysisInput: BeamsInput = { length, modulus, inertia, beamType, supportA, supportB, loads };
+
+  const { result: analysis } = useAnalysis<BeamsInput, BeamsResult>(
+    beamsService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ length, modulus, inertia, beamType, supportA, supportB, loads }),
+    [length, modulus, inertia, beamType, supportA, supportB, loads],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Beams',
+    module: '/beams',
+    getState,
+    onLoad: (state) => {
+      if (state.length !== undefined) setLength(state.length as number);
+      if (state.modulus !== undefined) setModulus(state.modulus as number);
+      if (state.inertia !== undefined) setInertia(state.inertia as number);
+      if (state.beamType !== undefined) setBeamType(state.beamType as 'simply_supported' | 'cantilever');
+      if (state.supportA !== undefined) setSupportA(state.supportA as number);
+      if (state.supportB !== undefined) setSupportB(state.supportB as number);
+      if (state.loads !== undefined) setLoads(state.loads as BeamLoadInput[]);
+    },
+  });
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggingSupport || !svgRef.current) return;
@@ -106,71 +107,14 @@ export default function Beams() {
     setLoads(loads.filter(l => l.id !== id));
   };
 
-  const updateLoad = (id: string, field: keyof BeamLoad, value: string | number) => {
+  const updateLoad = (id: string, field: keyof BeamLoadInput, value: string | number) => {
     setLoads(loads.map(l => {
       if (l.id !== id) return l;
-      // Default reset assumptions when changing types
       if (field === 'type') {
         return { ...l, type: value as LoadType, length: value === 'point' ? 0 : 2 };
       }
       return { ...l, [field]: value };
     }));
-  };
-
-  const [analysis, setAnalysis] = useState<any>(null);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const span = supportB - supportA;
-        if (beamType === 'simply_supported' && span <= 0) {
-           setAnalysis(null);
-           return;
-        }
-
-        const response = await fetch(apiUrl('/api/beams'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-             length, 
-             modulus, 
-             inertia, 
-             beamType, 
-             supportA, 
-             supportB, 
-             loads 
-          })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setAnalysis(data);
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [length, modulus, inertia, beamType, supportA, supportB, loads]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Beam Analysis ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Beams",
-          module: "/beams",
-          state: { length, modulus, inertia, beamType, supportA, supportB, loads }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
   };
 
   if (!analysis) return null; // Wait for consistent state

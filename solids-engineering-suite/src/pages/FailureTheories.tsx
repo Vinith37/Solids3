@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, Calculator, Info, Save, Share2, Target, Hash } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
+import { failureService } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import { useAnalysis } from '../hooks/useAnalysis';
+import type { FailureTheoriesInput, FailureTheoriesResult } from '../types/api';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -14,110 +17,59 @@ export default function FailureTheories() {
   const [tauXY, setTauXY] = useState<number>(0);
   const [sy, setSy] = useState<number>(250);
 
-  const [sigma1, setSigma1] = useState(150);
-  const [sigma2, setSigma2] = useState(50);
-  const [results, setResults] = useState({
-    vonMisesStress: 0,
-    nVonMises: 0,
-    nTresca: 0,
-    nRankine: 0,
-    isSafe: true
+  // --- Hooks ---
+  const analysisInput: FailureTheoriesInput = { sigmaX, sigmaY, tauXY, sy };
+
+  const { result: rawResult } = useAnalysis<FailureTheoriesInput, FailureTheoriesResult>(
+    failureService.analyze,
+    analysisInput,
+  );
+
+  const getState = useCallback(
+    () => ({ sigmaX, sigmaY, tauXY, sy }),
+    [sigmaX, sigmaY, tauXY, sy],
+  );
+
+  const { saveState } = useCalculation({
+    type: 'Failure Theories',
+    module: '/failure-theories',
+    getState,
+    onLoad: (state) => {
+      if (state.sigmaX !== undefined) setSigmaX(state.sigmaX as number);
+      if (state.sigmaY !== undefined) setSigmaY(state.sigmaY as number);
+      if (state.tauXY !== undefined) setTauXY(state.tauXY as number);
+      if (state.sy !== undefined) setSy(state.sy as number);
+    },
   });
 
-  const location = useLocation();
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setSigmaX(data.state.sigmaX);
-            setSigmaY(data.state.sigmaY);
-            setTauXY(data.state.tauXY);
-            setSy(data.state.sy);
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
-    async function executePythonBackend() {
-      try {
-        const response = await fetch(apiUrl('/api/failure-theories'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sigmaX, sigmaY, tauXY, sy })
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSigma1(data.sigma1);
-          setSigma2(data.sigma2);
-          setResults({
-            vonMisesStress: data.vonMisesStress,
-            nVonMises: data.nVonMises,
-            nTresca: data.nTresca,
-            nRankine: data.nRankine,
-            isSafe: data.isSafe
-          });
-        }
-      } catch (err) {
-        console.error("Python Backend Math Verification Failed:", err);
-      }
-    }
-    executePythonBackend();
-  }, [sigmaX, sigmaY, tauXY, sy]);
-
-  const saveState = async () => {
-    const name = prompt("Name this calculation:", `Failure Analysis ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
-
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Failure Theories",
-          module: "/failure-theories",
-          state: { sigmaX, sigmaY, tauXY, sy }
-        })
-      });
-      alert("Archived successfully!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
+  const results: FailureTheoriesResult = rawResult ?? {
+    sigma1: 150, sigma2: 50,
+    vonMisesStress: 0, nVonMises: 0, nTresca: 0, nRankine: 0, isSafe: true,
   };
+  const { sigma1, sigma2 } = results;
 
   // SVG Plotting constants
   const svgSize = 400;
   const center = svgSize / 2;
-  const scale = (svgSize / 2 - 40) / sy; // Scale relative to Yield Strength
+  const scale = (svgSize / 2 - 40) / sy;
 
-  // Generate Von Mises Ellipse path
   const generateVonMisesPath = () => {
     const points = [];
     for (let theta = 0; theta <= 360; theta += 5) {
       const rad = (theta * Math.PI) / 180;
       const a = sy * Math.sqrt(2);
       const b = sy * Math.sqrt(2/3);
-      
       const x = a * Math.cos(rad);
       const y = b * Math.sin(rad);
-      
       const cos45 = Math.cos(Math.PI / 4);
       const sin45 = Math.sin(Math.PI / 4);
       const rx = x * cos45 - y * sin45;
       const ry = x * sin45 + y * cos45;
-      
       points.push(`${center + rx * scale},${center - ry * scale}`);
     }
     return `M ${points.join(' L ')} Z`;
   };
 
-  // Generate Tresca (MSS) Hexagon path
   const generateTrescaPath = () => {
     const p1 = `${center + sy * scale},${center - sy * scale}`;
     const p2 = `${center + 0 * scale},${center - sy * scale}`;
@@ -128,7 +80,6 @@ export default function FailureTheories() {
     return `M ${p1} L ${p2} L ${p3} L ${p4} L ${p5} L ${p6} Z`;
   };
 
-  // Generate Rankine (MNS) Square path
   const generateRankinePath = () => {
     return `M ${center + sy * scale},${center - sy * scale} 
             L ${center - sy * scale},${center - sy * scale} 
@@ -243,21 +194,11 @@ export default function FailureTheories() {
                 <div className="relative w-full aspect-square bg-surface-container-lowest rounded-[1.5rem] md:rounded-[2rem] overflow-hidden ambient-shadow">
                   <div className="absolute inset-0 opacity-10 pointer-events-none bg-engineering-grid" />
                   <svg viewBox={`0 0 ${svgSize} ${svgSize}`} className="w-full h-full">
-                    {/* Axes */}
                     <line x1="0" y1={center} x2={svgSize} y2={center} stroke="black" strokeWidth="2.5" />
                     <line x1={center} y1="0" x2={center} y2={svgSize} stroke="black" strokeWidth="2.5" />
-                    {/* Axis Labels are moved below the envelopes to render on top! */}
-
-                    {/* Rankine Envelope */}
                     <path d={generateRankinePath()} fill="none" stroke="var(--color-orange-500, #f59e0b)" strokeWidth="2" strokeDasharray="4 4" opacity="0.4" />
-
-                    {/* Von Mises Envelope */}
                     <path d={generateVonMisesPath()} fill="rgba(60, 221, 199, 0.05)" stroke="var(--color-primary)" strokeWidth="3" />
-                    
-                    {/* Tresca Envelope */}
                     <path d={generateTrescaPath()} fill="none" stroke="var(--color-on-surface-variant)" strokeWidth="2" strokeDasharray="8 4" opacity="0.5" />
-
-                    {/* Current Stress Point */}
                     <circle 
                       cx={center + sigma1 * scale} 
                       cy={center - sigma2 * scale} 
@@ -281,8 +222,6 @@ export default function FailureTheories() {
                     >
                       ({sigma1}, {sigma2})
                     </text>
-
-                    {/* Axis Labels (Rendered last for maximum Z-Index) */}
                     <text x={svgSize - 30} y={center - 15} fill="var(--color-on-surface-variant)" fontSize="16" fontWeight="700" className="label-sm normal-case lowercase font-mono" paintOrder="stroke" stroke="var(--color-surface-container-lowest)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round">σ₁</text>
                     <text x={center + 15} y="30" fill="var(--color-on-surface-variant)" fontSize="16" fontWeight="700" className="label-sm normal-case lowercase font-mono" paintOrder="stroke" stroke="var(--color-surface-container-lowest)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round">σ₂</text>
                   </svg>

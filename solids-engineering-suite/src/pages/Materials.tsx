@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
@@ -9,48 +9,24 @@ import {
   Share2,
   Table as TableIcon
 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { apiUrl } from '../lib/api';
-
-interface Material {
-  name: string;
-  category: string;
-  density: number; // kg/m^3
-  modulus: number; // GPa
-  strength: number; // MPa
-  poisson: number;
-  thermalExpansion: number; // 10^-6/K
-  cost: number; // $/kg
-}
+import { materialsService, apiUrl } from '../services/api';
+import { useCalculation } from '../hooks/useCalculation';
+import type { Material } from '../types/api';
 
 export default function Materials() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [materialData, setMaterialData] = useState<Material[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('loadId');
-    if (id) {
-      fetch(apiUrl(`/api/load-calculation/${id}`))
-        .then(res => res.json())
-        .then(data => {
-          if (data.state) {
-            setSearch(data.state.search || '');
-            setCategory(data.state.category || 'All');
-          }
-        });
-    }
-  }, [location.search]);
-
-  useEffect(() => {
     fetch(apiUrl('/api/material-categories'))
       .then(res => res.json())
-      .then(data => setCategories(data));
+      .then(data => setCategories(data))
+      .catch(err => console.error('[Materials] Categories fetch failed:', err));
   }, []);
 
   useEffect(() => {
@@ -62,32 +38,26 @@ export default function Materials() {
           setMaterialData(data);
         }
       } catch (err) {
-        console.error("Fetch materials failed:", err);
+        console.error('[Materials] Fetch materials failed:', err);
       }
     };
     fetchMaterials();
   }, [search, category]);
 
-  const saveState = async () => {
-    const name = prompt("Name this selection:", `Material Search ${new Date().toLocaleTimeString()}`);
-    if (!name) return;
+  const getState = useCallback(
+    () => ({ search, category }),
+    [search, category],
+  );
 
-    try {
-      await fetch(apiUrl('/api/save-calculation'), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name,
-          type: "Materials",
-          module: "/materials",
-          state: { search, category }
-        })
-      });
-      alert("Selection archived!");
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
+  const { saveState } = useCalculation({
+    type: 'Materials',
+    module: '/materials',
+    getState,
+    onLoad: (state) => {
+      if (state.search !== undefined) setSearch(state.search as string);
+      if (state.category !== undefined) setCategory(state.category as string);
+    },
+  });
 
   return (
     <MainLayout>
