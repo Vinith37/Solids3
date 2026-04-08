@@ -18,10 +18,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.models.schemas import (
     FatigueInput, FailureTheoriesInput, MohrCircleInput,
     TorsionInput, DynamicInput, BeamsInput, BeamLoad,
+    ThinCylinderInput, BucklingInput,
 )
 from app.services.calculations import (
     compute_fatigue, compute_failure_theories, compute_mohr_circle,
     compute_torsion, compute_dynamic_loading, compute_beams,
+    compute_thin_cylinder, compute_buckling,
 )
 
 
@@ -334,3 +336,117 @@ class TestBeams:
         result = compute_beams(data)
         assert abs(result["Ra"] - 8) < 0.5
         assert abs(result["Ma"] - 40) < 1.0  # P×L = 8×5 = 40
+
+
+# ──────────────────────────────────────────────
+# 7. THIN CYLINDERS
+# ──────────────────────────────────────────────
+# Reference: Hibbeler Ch. 8 — Thin-walled pressure vessels
+#   r = 200 mm, t = 10 mm, p = 5 MPa, closed ends
+#   σ_h = pr/t = 5×200/10 = 100 MPa
+#   σ_l = pr/(2t) = 5×200/20 = 50 MPa
+#   τ_max = (σ_h - σ_l)/2 = 25 MPa
+#   r/t = 20 → thin-wall valid
+
+class TestThinCylinder:
+    def test_hoop_stress_closed(self):
+        """σ_h = pr/t = 5×200/10 = 100 MPa."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        assert abs(result["hoopStress"] - 100) < 0.01
+
+    def test_longitudinal_stress_closed(self):
+        """σ_l = pr/(2t) = 50 MPa for closed ends."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        assert abs(result["longStress"] - 50) < 0.01
+
+    def test_longitudinal_stress_open(self):
+        """σ_l = 0 for open-ended cylinders."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='open')
+        result = compute_thin_cylinder(data)
+        assert abs(result["longStress"]) < 0.01
+
+    def test_max_shear_closed(self):
+        """τ_max = (σ_h - σ_l)/2 = (100 - 50)/2 = 25 MPa."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        assert abs(result["maxShear"] - 25) < 0.01
+
+    def test_von_mises_closed(self):
+        """σ_vm = √(σ_h² - σ_h×σ_l + σ_l²) = √(10000 - 5000 + 2500) = √7500 ≈ 86.6 MPa."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        expected = math.sqrt(100**2 - 100*50 + 50**2)  # 86.60
+        assert abs(result["vonMises"] - expected) < 0.1
+
+    def test_rt_ratio(self):
+        """r/t = 200/10 = 20."""
+        data = ThinCylinderInput(innerRadius=200, wallThickness=10, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        assert abs(result["ratio"] - 20) < 0.01
+
+    def test_zero_thickness_returns_zeros(self):
+        data = ThinCylinderInput(innerRadius=200, wallThickness=0, pressure=5, endCondition='closed')
+        result = compute_thin_cylinder(data)
+        assert result["hoopStress"] == 0
+
+
+# ──────────────────────────────────────────────
+# 8. COLUMN BUCKLING
+# ──────────────────────────────────────────────
+# Reference: Hibbeler Ch. 13 — Euler's Formula
+#   L = 3 m, E = 200 GPa, I = 5000 cm⁴, A = 50 cm², K = 1.0
+#   Pcr = π²EI/(KL)² = π²×200e9×5000e-8 / (3)² = π²×10000 / 9 ≈ 10966.2 kN
+#   r = √(I/A) = √(5000e-8/50e-4) = √(1e-4) = 0.01 m
+#   λ = KL/r = 3/0.01 = 300
+
+class TestBuckling:
+    def test_critical_load_pinned_pinned(self):
+        """Pcr = π²EI/(KL)² with K=1.0"""
+        data = BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=1.0)
+        result = compute_buckling(data)
+        E_Pa = 200e9
+        I_m4 = 5000e-8
+        Pcr = (math.pi**2 * E_Pa * I_m4) / (3**2) / 1000  # kN
+        assert abs(result["Pcr"] - round(Pcr, 1)) < 1.0
+
+    def test_slenderness_ratio(self):
+        """λ = KL/r where r = √(I/A)"""
+        data = BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=1.0)
+        result = compute_buckling(data)
+        r_g = math.sqrt(5000e-8 / 50e-4)  # 0.01
+        expected = 3 / r_g  # 300
+        assert abs(result["slenderness"] - expected) < 1.0
+
+    def test_critical_stress(self):
+        """σ_cr = Pcr / A"""
+        data = BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=1.0)
+        result = compute_buckling(data)
+        Pcr_N = (math.pi**2 * 200e9 * 5000e-8) / 9
+        expected_sigma = Pcr_N / 50e-4 / 1e6  # MPa
+        assert abs(result["criticalStress"] - round(expected_sigma, 1)) < 1.0
+
+    def test_effective_length(self):
+        """Le = K × L"""
+        data = BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=0.7)
+        result = compute_buckling(data)
+        assert abs(result["effectiveLength"] - 2.1) < 0.01
+
+    def test_fixed_fixed_higher_pcr(self):
+        """K=0.5 → Le shorter → higher Pcr than K=1.0"""
+        pinned = compute_buckling(BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=1.0))
+        fixed = compute_buckling(BucklingInput(length=3, modulus=200, inertia=5000, area=50, endCondition=0.5))
+        assert fixed["Pcr"] > pinned["Pcr"]
+
+    def test_is_long_column(self):
+        """Slenderness > 30 → long column. I=100 cm⁴, A=20 cm² → r=√(100e-8/20e-4)=0.02236 → λ=134."""
+        data = BucklingInput(length=3, modulus=200, inertia=100, area=20, endCondition=1.0)
+        result = compute_buckling(data)
+        assert result["slenderness"] > 30
+        assert result["isLongColumn"] is True
+
+    def test_zero_area_returns_zeros(self):
+        data = BucklingInput(length=3, modulus=200, inertia=5000, area=0, endCondition=1.0)
+        result = compute_buckling(data)
+        assert result["Pcr"] == 0

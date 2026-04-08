@@ -22,6 +22,10 @@ import type {
   BeamsResult,
   Material,
   AshbyMaterial,
+  ThinCylinderInput,
+  ThinCylinderResult,
+  BucklingInput,
+  BucklingResult,
 } from '../types/api';
 
 // ---------------------------------------------------------------------------
@@ -173,4 +177,20 @@ export const materialsService = {
 
   listAshby: () =>
     request<AshbyMaterial[]>('/api/ashby-materials'),
+};
+
+export const thinCylinderService = {
+  analyze: (input: ThinCylinderInput) =>
+    request<ThinCylinderResult>('/api/thin-cylinder', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+};
+
+export const bucklingService = {
+  analyze: (input: BucklingInput) =>
+    request<BucklingResult>('/api/buckling', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 };

@@ -12,7 +12,9 @@ import {
   HelpCircle,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Cylinder,
+  Columns
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -23,6 +25,8 @@ const navItems = [
   { icon: Database, label: 'Material Properties', path: '/materials' },
   { icon: Zap, label: 'Torsion', path: '/torsion' },
   { icon: Layers, label: 'Beams', path: '/beams' },
+  { icon: Cylinder, label: 'Thin Cylinders', path: '/thin-cylinders' },
+  { icon: Columns, label: 'Buckling', path: '/buckling' },
   { icon: Wind, label: 'Ashby Chart', path: '/ashby' },
   { icon: Maximize, label: 'Fatigue & S-N', path: '/fatigue' },
   { icon: PieChart, label: 'Dynamic Loading', path: '/dynamic' },

@@ -14,7 +14,9 @@ import {
   Box,
   PieChart,
   Database,
-  Trash2
+  Trash2,
+  Cylinder,
+  Columns
 } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { useState, useEffect } from 'react';
@@ -85,6 +87,22 @@ const modules = [
     color: 'text-cyan-500',
     bg: 'bg-cyan-50',
     path: '/materials'
+  },
+  { 
+    title: 'Thin Cylinders', 
+    description: 'Hoop, longitudinal, and radial stress analysis for thin-walled pressure vessels.',
+    icon: Cylinder,
+    color: 'text-teal-500',
+    bg: 'bg-teal-50',
+    path: '/thin-cylinders'
+  },
+  { 
+    title: 'Column Buckling', 
+    description: 'Euler stability analysis for long columns with variable end-fixity conditions.',
+    icon: Columns,
+    color: 'text-indigo-500',
+    bg: 'bg-indigo-50',
+    path: '/buckling'
   },
 ];
 

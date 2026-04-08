@@ -197,3 +197,39 @@ export interface AshbyMaterial {
   strength_low: number;
   strength_high: number;
 }
+
+// --- Thin Cylinders ---
+
+export interface ThinCylinderInput {
+  innerRadius: number;    // mm
+  wallThickness: number;  // mm
+  pressure: number;       // MPa
+  endCondition: string;   // 'open' | 'closed'
+}
+
+export interface ThinCylinderResult {
+  hoopStress: number;
+  longStress: number;
+  radialStress: number;
+  vonMises: number;
+  maxShear: number;
+  ratio: number;
+}
+
+// --- Column Buckling ---
+
+export interface BucklingInput {
+  length: number;         // m
+  modulus: number;        // GPa
+  inertia: number;       // cm^4
+  area: number;          // cm^2
+  endCondition: number;  // K factor
+}
+
+export interface BucklingResult {
+  Pcr: number;
+  criticalStress: number;
+  slenderness: number;
+  effectiveLength: number;
+  isLongColumn: boolean;
+}

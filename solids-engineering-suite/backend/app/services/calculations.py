@@ -3,7 +3,11 @@ Engineering calculation service — pure math functions for all analysis endpoin
 Each function takes typed input and returns a dict result. No side effects.
 """
 import math
-from ..models.schemas import FatigueInput, FailureTheoriesInput, MohrCircleInput, TorsionInput, DynamicInput, BeamsInput
+from ..models.schemas import (
+    FatigueInput, FailureTheoriesInput, MohrCircleInput,
+    TorsionInput, DynamicInput, BeamsInput,
+    ThinCylinderInput, BucklingInput,
+)
 
 
 def compute_fatigue(data: FatigueInput) -> dict:
@@ -236,4 +240,86 @@ def compute_beams(data: BeamsInput) -> dict:
         "sortedLoads": sorted(
             [l.model_dump() for l in data.loads], key=lambda x: x["position"]
         ),
+    }
+
+
+def compute_thin_cylinder(data: ThinCylinderInput) -> dict:
+    """Thin-walled pressure vessel analysis.
+    Reference: Hibbeler Ch. 8 — σ_h = pr/t, σ_l = pr/(2t) for closed ends.
+    """
+    r = data.innerRadius  # mm
+    t = data.wallThickness  # mm
+    p = data.pressure  # MPa
+
+    if t <= 0 or r <= 0:
+        return {
+            "hoopStress": 0, "longStress": 0, "radialStress": 0,
+            "vonMises": 0, "maxShear": 0, "ratio": 0,
+        }
+
+    sigma_h = (p * r) / t  # Hoop (circumferential)
+
+    if data.endCondition == 'closed':
+        sigma_l = (p * r) / (2 * t)  # Longitudinal
+    else:
+        sigma_l = 0  # Open-ended
+
+    sigma_r = -p / 2  # Radial stress (at inner surface, approx)
+
+    # Von Mises for biaxial (plane stress — ignore radial for thin wall)
+    vm = math.sqrt(sigma_h**2 - sigma_h * sigma_l + sigma_l**2)
+    tau_max = (sigma_h - sigma_l) / 2 if data.endCondition == 'closed' else sigma_h / 2
+
+    return {
+        "hoopStress": round(sigma_h, 2),
+        "longStress": round(sigma_l, 2),
+        "radialStress": round(sigma_r, 2),
+        "vonMises": round(vm, 2),
+        "maxShear": round(abs(tau_max), 2),
+        "ratio": round(r / t, 2),
+    }
+
+
+def compute_buckling(data: BucklingInput) -> dict:
+    """Euler column buckling analysis.
+    Reference: Hibbeler Ch. 13 — Pcr = π²EI / (KL)²
+    K = effective length factor.
+    """
+    E = data.modulus * 1e3  # GPa → MPa
+    I = data.inertia  # cm^4
+    I_m4 = I * 1e-8  # cm^4 → m^4
+    A = data.area  # cm^2
+    A_m2 = A * 1e-4  # cm^2 → m^2
+    L = data.length  # m
+    K = data.endCondition  # effective length factor
+
+    Le = K * L  # effective length
+
+    if Le <= 0 or I_m4 <= 0 or A_m2 <= 0:
+        return {
+            "Pcr": 0, "criticalStress": 0, "slenderness": 0,
+            "effectiveLength": 0, "isLongColumn": False,
+        }
+
+    E_Pa = E * 1e6  # MPa → Pa
+    Pcr = (math.pi**2 * E_Pa * I_m4) / (Le**2)  # N
+    Pcr_kN = Pcr / 1000  # kN
+
+    # Radius of gyration
+    r_gyration = math.sqrt(I_m4 / A_m2)  # m
+    slenderness = Le / r_gyration if r_gyration > 0 else 0
+
+    # Critical stress
+    sigma_cr = Pcr / A_m2 if A_m2 > 0 else 0  # Pa
+    sigma_cr_MPa = sigma_cr / 1e6
+
+    # Long column check (slenderness > ~30 is typically Euler-valid)
+    is_long = slenderness > 30
+
+    return {
+        "Pcr": round(Pcr_kN, 1),
+        "criticalStress": round(sigma_cr_MPa, 1),
+        "slenderness": round(slenderness, 1),
+        "effectiveLength": round(Le, 3),
+        "isLongColumn": is_long,
     }

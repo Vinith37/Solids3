@@ -524,3 +524,45 @@ def calc_beams(data: BeamsInput):
         if abs(defl) > abs(maxD): maxD, maxDX = defl, x
         res.append({"x":round(x,2), "V":round(V_a[i],2), "M":round(M_a[i],2), "D":round(defl,3)})
     return {"Ra":Ra, "Rb":Rb, "Ma":Ma, "span":span, "data":res, "C1":C1, "C2":C2, "EI":EI, "sumPx_A":sumPx, "sumP":sumP, "maxDeflection":maxD, "maxDefX":maxDX, "maxMoment":maxM, "maxMomentX":maxMX, "sortedLoads":sorted([l.model_dump() for l in data.loads], key=lambda x:x["position"])}
+
+# --- Thin Cylinders ---
+class ThinCylinderInput(BaseModel):
+    innerRadius: float    # mm
+    wallThickness: float  # mm
+    pressure: float       # MPa
+    endCondition: str     # 'open' | 'closed'
+
+@app.post("/api/thin-cylinder")
+def calc_thin_cylinder(data: ThinCylinderInput):
+    r, t, p = data.innerRadius, data.wallThickness, data.pressure
+    if t <= 0 or r <= 0:
+        return {"hoopStress": 0, "longStress": 0, "radialStress": 0, "vonMises": 0, "maxShear": 0, "ratio": 0}
+    sigma_h = (p * r) / t
+    sigma_l = (p * r) / (2 * t) if data.endCondition == 'closed' else 0
+    sigma_r = -p / 2
+    vm = math.sqrt(sigma_h**2 - sigma_h * sigma_l + sigma_l**2)
+    tau_max = (sigma_h - sigma_l) / 2 if data.endCondition == 'closed' else sigma_h / 2
+    return {"hoopStress": round(sigma_h, 2), "longStress": round(sigma_l, 2), "radialStress": round(sigma_r, 2), "vonMises": round(vm, 2), "maxShear": round(abs(tau_max), 2), "ratio": round(r / t, 2)}
+
+# --- Column Buckling ---
+class BucklingInput(BaseModel):
+    length: float         # m
+    modulus: float        # GPa
+    inertia: float        # cm^4
+    area: float           # cm^2
+    endCondition: float   # K factor
+
+@app.post("/api/buckling")
+def calc_buckling(data: BucklingInput):
+    E = data.modulus * 1e3  # GPa -> MPa
+    I_m4 = data.inertia * 1e-8  # cm^4 -> m^4
+    A_m2 = data.area * 1e-4  # cm^2 -> m^2
+    Le = data.endCondition * data.length
+    if Le <= 0 or I_m4 <= 0 or A_m2 <= 0:
+        return {"Pcr": 0, "criticalStress": 0, "slenderness": 0, "effectiveLength": 0, "isLongColumn": False}
+    E_Pa = E * 1e6
+    Pcr = (math.pi**2 * E_Pa * I_m4) / (Le**2)
+    r_g = math.sqrt(I_m4 / A_m2)
+    slenderness = Le / r_g if r_g > 0 else 0
+    sigma_cr = (Pcr / A_m2) / 1e6 if A_m2 > 0 else 0
+    return {"Pcr": round(Pcr / 1000, 1), "criticalStress": round(sigma_cr, 1), "slenderness": round(slenderness, 1), "effectiveLength": round(Le, 3), "isLongColumn": slenderness > 30}

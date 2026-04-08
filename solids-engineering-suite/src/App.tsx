@@ -17,6 +17,8 @@ import Fatigue from './pages/Fatigue';
 import Ashby from './pages/Ashby';
 import DynamicLoading from './pages/DynamicLoading';
 import Materials from './pages/Materials';
+import ThinCylinders from './pages/ThinCylinders';
+import Buckling from './pages/Buckling';
 import Settings from './pages/Settings';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -43,6 +45,8 @@ export default function App() {
             <Route path="/ashby" element={<PrivateRoute><Ashby /></PrivateRoute>} />
             <Route path="/dynamic" element={<PrivateRoute><DynamicLoading /></PrivateRoute>} />
             <Route path="/materials" element={<PrivateRoute><Materials /></PrivateRoute>} />
+            <Route path="/thin-cylinders" element={<PrivateRoute><ThinCylinders /></PrivateRoute>} />
+            <Route path="/buckling" element={<PrivateRoute><Buckling /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>

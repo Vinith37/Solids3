@@ -96,3 +96,23 @@ class Material(BaseModel):
     poisson: float
     thermalExpansion: float  # 10^-6/K
     cost: float  # $/kg
+
+
+# --- Thin Cylinders ---
+
+class ThinCylinderInput(BaseModel):
+    innerRadius: float    # mm
+    wallThickness: float  # mm
+    pressure: float       # MPa (internal gauge pressure)
+    endCondition: str     # 'open' | 'closed'
+
+
+# --- Column Buckling ---
+
+class BucklingInput(BaseModel):
+    length: float         # m
+    modulus: float        # GPa (E)
+    inertia: float        # cm^4 (I)
+    area: float           # cm^2 (A)
+    endCondition: float   # K factor (0.5, 0.7, 1.0, 2.0)
+
