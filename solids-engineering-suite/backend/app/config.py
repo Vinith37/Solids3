@@ -21,6 +21,8 @@ if USE_FIRESTORE:
 
 # CORS origins
 _default_origins = [
+    "https://structuralsolver.com",
+    "https://www.structuralsolver.com",
     "https://solids-cc164.web.app",
     "https://solids-cc164.firebaseapp.com",
     "http://localhost:3000",

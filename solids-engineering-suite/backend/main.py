@@ -28,6 +28,8 @@ app = FastAPI()
 # CORS: allow the Firebase Hosting URL + localhost for development.
 # Override via ALLOWED_ORIGINS env var (comma-separated list).
 _default_origins = [
+    "https://structuralsolver.com",
+    "https://www.structuralsolver.com",
     "https://solids-cc164.web.app",
     "https://solids-cc164.firebaseapp.com",
     "http://localhost:3000",

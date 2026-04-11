@@ -49,7 +49,7 @@ export default function Beams() {
   // --- Hooks ---
   const analysisInput: BeamsInput = { length, modulus, inertia, beamType, supportA, supportB, loads };
 
-  const { result: analysis } = useAnalysis<BeamsInput, BeamsResult>(
+  const { result: analysis, isLoading, error } = useAnalysis<BeamsInput, BeamsResult>(
     beamsService.analyze,
     analysisInput,
   );
@@ -117,7 +117,28 @@ export default function Beams() {
     }));
   };
 
-  if (!analysis) return null; // Wait for consistent state
+  if (!analysis) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          {error ? (
+            <div className="text-error bg-error/10 p-6 rounded-2xl flex items-center gap-3">
+              <Info className="w-6 h-6" />
+              <div>
+                <h3 className="font-bold text-lg mb-1">Analysis Error</h3>
+                <p>{error}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-on-surface-variant animate-pulse">Running beam analysis...</p>
+            </div>
+          )}
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
