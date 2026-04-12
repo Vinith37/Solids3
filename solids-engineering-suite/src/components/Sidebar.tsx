@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { 
   LayoutGrid, 
   Settings, 
@@ -14,9 +15,11 @@ import {
   ChevronRight,
   X,
   Cylinder,
-  Columns
+  Columns,
+  MessageSquare
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import FeedbackModal from './FeedbackModal';
 
 const navItems = [
   { icon: LayoutGrid, label: 'Dashboard', path: '/dashboard' },
@@ -43,6 +46,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -108,8 +112,22 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
             <HelpCircle className="w-4 h-4 shrink-0" />
             {!isCollapsed && <span className="truncate">Documentation</span>}
           </button>
+          
+          <button 
+            onClick={() => setIsFeedbackModalOpen(true)}
+            title={isCollapsed ? 'Feedback' : undefined}
+            className={`w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            {!isCollapsed && <span className="truncate">Feedback</span>}
+          </button>
         </div>
       </aside>
+
+      <FeedbackModal 
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+      />
     </>
   );
 }

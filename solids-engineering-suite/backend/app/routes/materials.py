@@ -1,16 +1,20 @@
 """
 Routes for materials database and Ashby chart data.
+Auth at router level. Sync endpoints (in-memory data, no I/O).
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Depends
 from typing import Optional
 from ..data.materials import materials_db
 from ..data.ashby import ashby_materials_db
+from ..auth import verify_firebase_token
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(verify_firebase_token)]
+)
 
 
 @router.get("/api/materials")
-def get_materials(search: Optional[str] = "", category: Optional[str] = "All"):
+def get_materials(request: Request, search: Optional[str] = "", category: Optional[str] = "All"):
     results = materials_db
     if category != "All":
         results = [m for m in results if m["category"] == category]
@@ -24,11 +28,11 @@ def get_materials(search: Optional[str] = "", category: Optional[str] = "All"):
 
 
 @router.get("/api/material-categories")
-def get_material_categories():
+def get_material_categories(request: Request):
     cats = sorted(list(set(m["category"] for m in materials_db)))
     return ["All"] + cats
 
 
 @router.get("/api/ashby-materials")
-def get_ashby_materials():
+def get_ashby_materials(request: Request):
     return ashby_materials_db

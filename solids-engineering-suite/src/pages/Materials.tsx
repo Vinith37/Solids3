@@ -11,9 +11,35 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import { materialsService, apiUrl } from '../services/api';
+import { materialsService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import type { Material } from '../types/api';
+
+// Helper to fetch categories through the auth-injecting API layer
+import { auth } from '../lib/firebase';
+
+async function fetchCategoriesWithAuth(): Promise<string[]> {
+  const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}/api/material-categories`, { headers });
+  if (!res.ok) throw new Error(`Categories fetch failed: ${res.status}`);
+  return res.json();
+}
+
+async function fetchMaterialsWithAuth(search: string, category: string): Promise<Material[]> {
+  const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(
+    `${BASE_URL}/api/materials?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`Materials fetch failed: ${res.status}`);
+  return res.json();
+}
 
 export default function Materials() {
   const navigate = useNavigate();
@@ -23,25 +49,15 @@ export default function Materials() {
   const [categories, setCategories] = useState<string[]>(['All']);
 
   useEffect(() => {
-    fetch(apiUrl('/api/material-categories'))
-      .then(res => res.json())
+    fetchCategoriesWithAuth()
       .then(data => setCategories(data))
       .catch(err => console.error('[Materials] Categories fetch failed:', err));
   }, []);
 
   useEffect(() => {
-    const fetchMaterials = async () => {
-      try {
-        const response = await fetch(apiUrl(`/api/materials?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`));
-        if (response.ok) {
-          const data = await response.json();
-          setMaterialData(data);
-        }
-      } catch (err) {
-        console.error('[Materials] Fetch materials failed:', err);
-      }
-    };
-    fetchMaterials();
+    fetchMaterialsWithAuth(search, category)
+      .then(data => setMaterialData(data))
+      .catch(err => console.error('[Materials] Fetch materials failed:', err));
   }, [search, category]);
 
   const getState = useCallback(

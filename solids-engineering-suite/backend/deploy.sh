@@ -2,6 +2,8 @@
 # ============================================================
 # deploy.sh – Build and deploy the SOLIDS backend to Cloud Run
 # ============================================================
+# Uses Google Cloud Build (remote) — no local Docker required.
+#
 # Usage:
 #   cd backend/
 #   chmod +x deploy.sh
@@ -9,8 +11,7 @@
 #
 # Prerequisites:
 #   - gcloud CLI installed and authenticated
-#   - Docker installed
-#   - Artifact Registry API and Cloud Run API enabled
+#   - Cloud Build API and Cloud Run API enabled
 # ============================================================
 
 set -euo pipefail
@@ -19,14 +20,12 @@ PROJECT_ID="solids-cc164"
 REGION="us-central1"
 SERVICE_NAME="solids-backend"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
-AR_REPO="gcr.io"   # using Container Registry (GCR); switch to Artifact Registry if preferred
 
-echo "==> Building Docker image: ${IMAGE_NAME}"
-docker build --platform linux/amd64 -t "${IMAGE_NAME}" .
-
-echo "==> Pushing image to GCR: ${IMAGE_NAME}"
-gcloud auth configure-docker --quiet
-docker push "${IMAGE_NAME}"
+echo "==> Building Docker image remotely via Cloud Build: ${IMAGE_NAME}"
+gcloud builds submit \
+  --tag "${IMAGE_NAME}" \
+  --project "${PROJECT_ID}" \
+  --quiet
 
 echo "==> Deploying to Cloud Run (${SERVICE_NAME} in ${REGION})"
 gcloud run deploy "${SERVICE_NAME}" \
@@ -36,11 +35,14 @@ gcloud run deploy "${SERVICE_NAME}" \
   --project "${PROJECT_ID}" \
   --allow-unauthenticated \
   --port 8080 \
-  --set-env-vars "USE_FIRESTORE=true,FIRESTORE_COLLECTION=savedCalculations" \
+  --set-env-vars "USE_FIRESTORE=true,FIRESTORE_COLLECTION=savedCalculations,GOOGLE_CLOUD_PROJECT=${PROJECT_ID}" \
   --service-account "firebase-adminsdk-fbsvc@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --memory 512Mi \
-  --min-instances 0 \
-  --max-instances 5
+  --memory 1Gi \
+  --cpu 1 \
+  --min-instances 1 \
+  --max-instances 25 \
+  --concurrency 80 \
+  --cpu-boost
 
 echo ""
 echo "==> Deployment complete!"
