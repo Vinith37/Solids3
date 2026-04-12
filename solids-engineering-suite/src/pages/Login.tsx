@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-surface flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 bg-engineering-pattern opacity-20 pointer-events-none"></div>
-      
+
       <header className="w-full relative z-10">
         <div className="flex justify-between items-center px-12 py-8 max-w-7xl mx-auto">
           <Link to="/" className="text-2xl font-bold tracking-tighter text-primary font-headline italic uppercase">
@@ -37,13 +37,12 @@ export default function Login() {
           </Link>
           <div className="flex items-center gap-8">
             <a href="#" className="text-on-surface-variant hover:text-primary transition-colors label-sm">Support</a>
-            <Link to="/signup" className="text-primary font-bold label-sm">Create Account</Link>
           </div>
         </div>
       </header>
 
       <main className="flex-grow flex items-center justify-center px-4 py-12 relative z-10">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
@@ -66,17 +65,17 @@ export default function Login() {
 
             <form className="space-y-8" onSubmit={handleSubmit}>
               <div className="space-y-3">
-                <label className="label-sm text-on-surface-variant block ml-1" htmlFor="email">Work Email</label>
+                <label className="label-sm text-on-surface-variant block ml-1" htmlFor="email">Email ID</label>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                     <Mail className="w-5 h-5 text-on-surface-variant group-focus-within:text-primary transition-colors" />
                   </div>
-                  <input 
-                    className="block w-full pl-14 pr-6 py-4 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all placeholder:text-on-surface-variant/40" 
-                    id="email" 
-                    placeholder="engineer@company.com" 
+                  <input
+                    className="block w-full pl-14 pr-6 py-4 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all placeholder:text-on-surface-variant/40"
+                    id="email"
+                    placeholder="engineer@company.com"
                     type="email"
-                    required 
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -92,26 +91,37 @@ export default function Login() {
                   <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                     <Lock className="w-5 h-5 text-on-surface-variant group-focus-within:text-primary transition-colors" />
                   </div>
-                  <input 
-                    className="block w-full pl-14 pr-6 py-4 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all placeholder:text-on-surface-variant/40" 
-                    id="password" 
-                    placeholder="••••••••" 
+                  <input
+                    className="block w-full pl-14 pr-6 py-4 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all placeholder:text-on-surface-variant/40"
+                    id="password"
+                    placeholder="••••••••"
                     type="password"
-                    required 
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={loading}
                 className="w-full primary-gradient text-on-primary font-bold py-4 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-xl shadow-primary/20 disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
               >
-                <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+                <span>{loading ? 'Logging in...' : 'Login'}</span>
                 {!loading && <ArrowRight className="w-5 h-5" />}
               </button>
+              <div className="text-center mt-4">
+                <span className="text-on-surface-variant">
+                  Don’t have an account?{" "}
+                </span>
+                <Link
+                  to="/signup"
+                  className="text-primary font-bold hover:underline"
+                >
+                  Create Account
+                </Link>
+              </div>
             </form>
           </div>
 

@@ -9,7 +9,7 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { signup, error, setError } = useAuth();
   const navigate = useNavigate();
 
@@ -22,20 +22,20 @@ export default function SignUp() {
       setSuccessMsg('');
       setLoading(true);
       await signup(email, password, name);
-      
+
       // Show success state
       setSuccessMsg('Account created successfully! Redirecting...');
-      
+
       // Give a slight delay so user can read the success message
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
-      
+
     } catch (err: any) {
       console.error(err);
       // The error is already set via AuthContext, but we can manage local loading state
       setLoading(false);
-    } 
+    }
   };
 
   return (
@@ -55,7 +55,7 @@ export default function SignUp() {
       </header>
 
       <main className="flex-grow relative z-10 flex items-center justify-center px-4 py-12">
-        <motion.section 
+        <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
@@ -83,10 +83,10 @@ export default function SignUp() {
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-3">
                 <label className="label-sm text-on-surface-variant block ml-1">Full Name</label>
-                <input 
-                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none" 
-                  placeholder="Dr. Sarah Chen" 
-                  type="text" 
+                <input
+                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none"
+                  placeholder="Dr. Sarah Chen"
+                  type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -94,11 +94,11 @@ export default function SignUp() {
               </div>
 
               <div className="space-y-3">
-                <label className="label-sm text-on-surface-variant block ml-1">Corporate Email</label>
-                <input 
-                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none" 
-                  placeholder="sarah@engineering.co" 
-                  type="email" 
+                <label className="label-sm text-on-surface-variant block ml-1">Email ID</label>
+                <input
+                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none"
+                  placeholder="sarah@engineering.co"
+                  type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -107,10 +107,10 @@ export default function SignUp() {
 
               <div className="space-y-3">
                 <label className="label-sm text-on-surface-variant block ml-1">Password</label>
-                <input 
-                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none" 
-                  placeholder="••••••••••••" 
-                  type="password" 
+                <input
+                  className="w-full bg-surface-container-highest rounded-2xl px-6 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 ring-primary/20 transition-all outline-none"
+                  placeholder="••••••••••••"
+                  type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -125,7 +125,7 @@ export default function SignUp() {
               </div>
 
               <div className="pt-6">
-                <button 
+                <button
                   type="submit"
                   disabled={loading}
                   className="w-full primary-gradient text-on-primary font-bold py-4 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-primary/20 flex items-center justify-center disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed"
@@ -136,7 +136,7 @@ export default function SignUp() {
 
               <div className="text-center pt-4">
                 <p className="body-sm text-on-surface-variant">
-                  Already have an account? 
+                  Already have an account?
                   <Link to="/login" className="text-primary font-bold hover:text-primary-dim ml-1">Sign In</Link>
                 </p>
               </div>
