@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Compass, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "../services/firebase";
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -23,6 +25,21 @@ export default function Login() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+
+      const user = result.user;
+
+      console.log("User:", user);
+
+      navigate("/dashboard");
+
+    } catch (error) {
+      console.error("Google Login Error:", error);
     }
   };
 
@@ -110,6 +127,9 @@ export default function Login() {
               >
                 <span>{loading ? 'Logging in...' : 'Login'}</span>
                 {!loading && <ArrowRight className="w-5 h-5" />}
+              </button>
+              <button className="google-btn" onClick={handleGoogleLogin}>
+                Continue with Google
               </button>
               <div className="text-center mt-4">
                 <span className="text-on-surface-variant">
