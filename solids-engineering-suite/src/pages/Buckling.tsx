@@ -7,7 +7,8 @@ import {
   Share2,
   Columns,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Hash
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
@@ -15,6 +16,10 @@ import { bucklingService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { BucklingInput, BucklingResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
+import 'katex/dist/katex.min.css';
+import { BlockMath, InlineMath } from 'react-katex';
 
 const END_CONDITIONS = [
   { label: 'Fixed-Free (K=2.0)', value: 2.0, desc: 'Cantilever column' },
@@ -97,49 +102,37 @@ export default function Buckling() {
                 Column Properties
               </h3>
               
-              <div className="space-y-6">
+              <div className="space-y-5">
+                <UnitInput
+                  label="Column Length"
+                  value={length}
+                  onChange={setLength}
+                  unitType="length"
+                />
+                <UnitInput
+                  label="Elastic Modulus (E)"
+                  value={modulus}
+                  onChange={setModulus}
+                  unitType="modulus"
+                />
+                <UnitInput
+                  label="Moment of Inertia (I)"
+                  value={inertia}
+                  onChange={setInertia}
+                  unitType="inertia"
+                />
+                <UnitInput
+                  label="Cross-Section Area (A)"
+                  value={area}
+                  onChange={setArea}
+                  unitType="area"
+                />
                 <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Column Length (m)</label>
-                  <input 
-                    type="number" 
-                    value={length} 
-                    onChange={(e) => setLength(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Elastic Modulus E (GPa)</label>
-                  <input 
-                    type="number" 
-                    value={modulus}
-                    onChange={(e) => setModulus(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Moment of Inertia I (cm⁴)</label>
-                  <input 
-                    type="number" 
-                    value={inertia} 
-                    onChange={(e) => setInertia(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Cross-Section Area A (cm²)</label>
-                  <input 
-                    type="number" 
-                    value={area} 
-                    onChange={(e) => setArea(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">End Condition (K)</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant mb-2.5">End Condition (K)</label>
                   <select 
                     value={endCondition}
                     onChange={(e) => setEndCondition(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
+                    className="w-full px-5 py-3.5 bg-surface-container-highest rounded-2xl outline-none text-on-surface text-sm focus:ring-2 ring-primary/20 transition-all appearance-none border border-outline/5"
                   >
                     {END_CONDITIONS.map(ec => (
                       <option key={ec.value} value={ec.value}>{ec.label}</option>
@@ -176,11 +169,11 @@ export default function Buckling() {
                   {/* Primary result */}
                   <div>
                     <div className="flex items-baseline gap-4 mb-2">
-                      <span className="text-4xl md:text-6xl font-black text-primary">{results.Pcr.toFixed(1)}</span>
-                      <div>
-                        <span className="text-xl md:text-2xl font-bold text-on-surface">Critical Load P<sub>cr</sub></span>
-                        <p className="label-sm text-on-surface-variant uppercase tracking-wider mt-1">Euler stability limit in kN</p>
-                      </div>
+                      <UnitDisplay value={results.Pcr} unitType="force" precision={1} valueClassName="text-4xl md:text-6xl font-black text-primary" />
+                    </div>
+                    <div>
+                      <span className="text-xl md:text-2xl font-bold text-on-surface">Critical Load P<sub>cr</sub></span>
+                      <p className="label-sm text-on-surface-variant uppercase tracking-wider mt-1">Euler stability limit</p>
                     </div>
                   </div>
                   
@@ -204,14 +197,13 @@ export default function Buckling() {
                       transition={{ delay: 0.2 }}
                     >
                       <p className="label-sm text-on-surface-variant mb-2">Critical Stress</p>
-                      <p className="text-xl md:text-2xl font-black text-on-surface">{results.criticalStress.toFixed(1)}</p>
-                      <p className="text-[10px] text-on-surface-variant mt-1">MPa</p>
+                      <UnitDisplay value={results.criticalStress} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-black text-on-surface" />
                     </motion.div>
                   </div>
 
                   <div className="pt-6 md:pt-8 border-t border-outline/10">
                     <p className="label-sm text-on-surface-variant mb-2">Effective Length (KL)</p>
-                    <p className="text-xl md:headline-md text-on-surface">{results.effectiveLength.toFixed(3)} m</p>
+                    <UnitDisplay value={results.effectiveLength} unitType="length" precision={3} valueClassName="text-xl md:headline-md text-on-surface" />
                   </div>
                 </div>
 
@@ -272,6 +264,44 @@ export default function Buckling() {
             </div>
           </div>
         </div>
+
+        {/* Detailed Calculation Section */}
+        <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] mt-4 lg:mt-8 ambient-shadow relative overflow-hidden">
+          <h3 className="text-xl md:headline-sm text-on-surface mb-6 md:mb-8 flex items-center gap-3 relative z-10"><Hash className="w-6 h-6 text-primary" />Detailed Calculation Steps</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative z-10">
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">1. Geometric & Slenderness Limits</h4>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <p className="body-sm text-on-surface-variant mb-2">Determine the Effective Length (<InlineMath math="L_e" />) using the specified boundary multiplier (<InlineMath math={`K = ${endCondition}`} />):</p>
+                  <BlockMath math={`L_e = K \\cdot L = ${endCondition} \\cdot ${length} = ${results.effectiveLength.toFixed(3)} \\text{ m}`} />
+                  <p className="body-sm text-on-surface-variant mt-4 mb-2">Assess column stability regime by calculating the Slenderness Ratio (<InlineMath math="\lambda" />):</p>
+                  <BlockMath math={`r_{gyration} = \\sqrt{\\frac{I}{A}}`} />
+                  <BlockMath math={`\\lambda = \\frac{L_e}{r_{gyration}} = ${results.slenderness.toFixed(2)}`} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">2. Euler's Critical Buckling Limit</h4>
+                <p className="body-sm text-on-surface-variant mb-4 font-bold uppercase tracking-widest text-[10px]">Critical Load Analysis</p>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <p className="body-sm text-on-surface-variant mb-2">Calculating the maximum axial compressive load before structural instability (<InlineMath math="P_{cr}" />):</p>
+                  <BlockMath math={`P_{cr} = \\frac{\\pi^2 E I}{L_e^2}`} />
+                  <BlockMath math={`P_{cr} = \\frac{\\pi^2 (${modulus} \\times 10^3) (${inertia} \\times 10^{-8})}{(${results.effectiveLength.toFixed(3)})^2}`} />
+                  <BlockMath math={`P_{cr} = ${results.Pcr.toFixed(1)} \\text{ kN}`} />
+                </div>
+                <hr className="border-outline/10 my-4" />
+                <p className="body-sm text-on-surface-variant mb-4 font-bold uppercase tracking-widest text-[10px]">Critical Stress</p>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <BlockMath math={`\\sigma_{cr} = \\frac{P_{cr}}{A} = ${results.criticalStress.toFixed(1)} \\text{ MPa}`} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </MainLayout>
   );

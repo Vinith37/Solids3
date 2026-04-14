@@ -27,6 +27,8 @@ import { beamsService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { BeamsInput, BeamsResult, BeamLoadInput } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -73,6 +75,41 @@ export default function Beams() {
       if (state.loads !== undefined) setLoads(state.loads as BeamLoadInput[]);
     },
   });
+
+  const handleLengthChange = (newLength: number) => {
+    setLength(newLength);
+    
+    // Auto-constrain supports to prevent them from falling off the beam
+    let sa = supportA;
+    let sb = supportB;
+    if (sb > newLength) sb = newLength;
+    if (sa > newLength) sa = Math.max(0, newLength - 0.1);
+    if (sa >= sb) sa = Math.max(0, sb - 0.1);
+    if (sb !== supportB) setSupportB(sb);
+    if (sa !== supportA) setSupportA(sa);
+
+    // Auto-constrain loads
+    let loadsChanged = false;
+    const newLoads = loads.map(l => {
+      let lPos = l.position;
+      let lLen = l.length;
+      if (lPos > newLength) {
+        lPos = newLength;
+        loadsChanged = true;
+      }
+      // Assuming UDL/UVL length doesn't extend beyond beam
+      if (lPos + lLen > newLength) {
+        lLen = Math.max(0, newLength - lPos);
+        loadsChanged = true;
+      }
+      if (lPos !== l.position || lLen !== l.length) {
+        return { ...l, position: lPos, length: lLen };
+      }
+      return l;
+    });
+    
+    if (loadsChanged) setLoads(newLoads);
+  };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggingSupport || !svgRef.current) return;
@@ -180,34 +217,27 @@ export default function Beams() {
                 Beam Properties
               </h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="sm:col-span-2">
-                  <label className="block label-sm text-on-surface-variant mb-3">Beam Length (m)</label>
-                  <input 
-                    type="number" 
-                    value={length} 
-                    onChange={(e) => setLength(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
+                  <UnitInput
+                    label="Beam Length"
+                    value={length}
+                    onChange={handleLengthChange}
+                    unitType="length"
                   />
                 </div>
-                <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">E (GPa)</label>
-                  <input 
-                    type="number" 
-                    value={modulus} 
-                    onChange={(e) => setModulus(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">I (cm⁴)</label>
-                  <input 
-                    type="number" 
-                    value={inertia} 
-                    onChange={(e) => setInertia(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
+                <UnitInput
+                  label="Elastic Modulus (E)"
+                  value={modulus}
+                  onChange={setModulus}
+                  unitType="modulus"
+                />
+                <UnitInput
+                  label="Moment of Inertia (I)"
+                  value={inertia}
+                  onChange={setInertia}
+                  unitType="inertia"
+                />
               </div>
             </div>
 
@@ -247,49 +277,37 @@ export default function Beams() {
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block label-sm text-on-surface-variant mb-2">Start Pos (m)</label>
-                        <input 
-                          type="number" 
-                          value={load.position} 
-                          onChange={(e) => updateLoad(load.id, 'position', Number(e.target.value))}
-                          className="w-full px-4 py-2 bg-surface-container-highest rounded-xl outline-none text-on-surface font-mono" 
-                        />
-                      </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <UnitInput
+                        label="Start Position"
+                        value={load.position}
+                        onChange={(v) => updateLoad(load.id, 'position', v)}
+                        unitType="length"
+                      />
                       
                       {load.type !== 'point' && (
-                        <div>
-                          <label className="block label-sm text-on-surface-variant mb-2">Length (m)</label>
-                          <input 
-                            type="number" 
-                            value={load.length} 
-                            onChange={(e) => updateLoad(load.id, 'length', Number(e.target.value))}
-                            className="w-full px-4 py-2 bg-surface-container-highest rounded-xl outline-none text-on-surface font-mono" 
-                          />
-                        </div>
+                        <UnitInput
+                          label="Load Length"
+                          value={load.length}
+                          onChange={(v) => updateLoad(load.id, 'length', v)}
+                          unitType="length"
+                        />
                       )}
                       
-                      <div>
-                        <label className="block label-sm text-on-surface-variant mb-2">{load.type === 'point' ? 'Load' : 'Start W'} (kN)</label>
-                        <input 
-                          type="number" 
-                          value={load.magnitude} 
-                          onChange={(e) => updateLoad(load.id, 'magnitude', Number(e.target.value))}
-                          className="w-full px-4 py-2 bg-surface-container-highest rounded-xl outline-none text-on-surface font-mono" 
-                        />
-                      </div>
+                      <UnitInput
+                        label={load.type === 'point' ? 'Load' : 'Start W'}
+                        value={load.magnitude}
+                        onChange={(v) => updateLoad(load.id, 'magnitude', v)}
+                        unitType="force"
+                      />
 
                       {load.type === 'uvl' && (
-                        <div>
-                          <label className="block label-sm text-on-surface-variant mb-2">End W (kN)</label>
-                          <input 
-                            type="number" 
-                            value={load.endMagnitude} 
-                            onChange={(e) => updateLoad(load.id, 'endMagnitude', Number(e.target.value))}
-                            className="w-full px-4 py-2 bg-surface-container-highest rounded-xl outline-none text-on-surface font-mono" 
-                          />
-                        </div>
+                        <UnitInput
+                          label="End W"
+                          value={load.endMagnitude}
+                          onChange={(v) => updateLoad(load.id, 'endMagnitude', v)}
+                          unitType="force"
+                        />
                       )}
                     </div>
                   </div>
@@ -311,11 +329,11 @@ export default function Beams() {
                   <div className="grid grid-cols-2 gap-6 md:gap-8">
                     <div>
                       <p className="label-sm text-on-surface-variant mb-1">Rₐ (Left)</p>
-                      <p className="text-xl md:text-2xl font-bold text-on-surface">{analysis.Ra.toFixed(2)} <span className="label-sm opacity-40">kN</span></p>
+                      <UnitDisplay value={analysis.Ra} unitType="force" precision={2} valueClassName="text-xl md:text-2xl font-bold text-on-surface" />
                     </div>
                     <div>
                       <p className="label-sm text-on-surface-variant mb-1">R_b (Right)</p>
-                      <p className="text-xl md:text-2xl font-bold text-on-surface">{analysis.Rb.toFixed(2)} <span className="label-sm opacity-40">kN</span></p>
+                      <UnitDisplay value={analysis.Rb} unitType="force" precision={2} valueClassName="text-xl md:text-2xl font-bold text-on-surface" />
                     </div>
                   </div>
                 </div>
@@ -582,33 +600,29 @@ export default function Beams() {
             
             <div className="space-y-6">
               <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
-                <h4 className="label-lg text-primary mb-4">1. Reaction Forces Equations of Equilibrium</h4>
+                <h4 className="label-lg text-primary mb-4">1. Equilibrium Equations</h4>
                 {beamType === 'simply_supported' ? (
                   <>
-                    <p className="body-sm text-on-surface-variant mb-2">Taking moments about support A to find the normal reaction at B (<InlineMath math="R_b" />):</p>
-                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
-                      <BlockMath math={`\\Sigma M_A = 0 \\implies R_b \\cdot (${analysis.span.toFixed(1)}) - \\sum (P_i \\cdot (x_i - A)) = 0`} />
-                      <BlockMath math={`R_b = \\frac{\\sum P_i (x_i - A)}{B - A} = \\frac{${analysis.sumPx_A.toFixed(2)}}{${analysis.span.toFixed(2)}} = ${analysis.Rb.toFixed(2)} \\text{ kN}`} />
-                    </div>
-                    <hr className="my-4 border-outline/10" />
-                    <p className="body-sm text-on-surface-variant mb-2">Resolving forces vertically to find reaction at A (<InlineMath math="R_a" />):</p>
-                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
-                      <BlockMath math={`\\Sigma F_y = 0 \\implies R_a + R_b - \\sum P_i = 0`} />
-                      <BlockMath math={`R_a = \\sum P_i - R_b = ${analysis.sumP.toFixed(2)} - ${analysis.Rb.toFixed(2)} = ${analysis.Ra.toFixed(2)} \\text{ kN}`} />
+                    <div className="overflow-x-auto text-on-surface pb-2 text-sm space-y-4">
+                      <div className="text-on-surface-variant body-sm mb-2">Equilibrium equations in all directions:</div>
+                      <BlockMath math={`\\Sigma F_x = 0 \\implies R_x = 0`} />
+                      <BlockMath math={`\\Sigma F_y = 0 \\implies R_a + R_b = \\sum P_i = ${analysis.sumP.toFixed(2)} \\text{ kN} \\quad \\text{--- (1)}`} />
+                      <BlockMath math={`\\Sigma M_A = 0 \\implies - \\sum (P_i \\cdot x_i) + R_b \\cdot (${analysis.span.toFixed(2)}) = 0`} />
+                      <BlockMath math={`- ${analysis.sumPx_A.toFixed(2)} + ${analysis.span.toFixed(2)}(R_b) = 0`} />
+                      <BlockMath math={`R_b = \\frac{${analysis.sumPx_A.toFixed(2)}}{${analysis.span.toFixed(2)}} = ${analysis.Rb.toFixed(2)} \\text{ kN}`} />
+                      
+                      <div className="mt-4 pt-4 border-t border-outline/10 text-on-surface-variant body-sm mb-2">Substitute in (1):</div>
+                      <BlockMath math={`R_a = ${analysis.sumP.toFixed(2)} - ${analysis.Rb.toFixed(2)} \\implies R_a = ${analysis.Ra.toFixed(2)} \\text{ kN}`} />
                     </div>
                   </>
                 ) : (
                   <>
                     <p className="body-sm text-on-surface-variant mb-2">Analyzing the fixed support <InlineMath math="A" /> (x=0) retaining structural rotations (<InlineMath math="M_a" />):</p>
                     <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                      <BlockMath math={`\\Sigma F_x = 0 \\implies R_x = 0`} />
+                      <BlockMath math={`\\Sigma F_y = 0 \\implies R_a - \\sum P_i = 0 \\implies R_a = ${analysis.Ra.toFixed(2)} \\text{ kN}`} />
                       <BlockMath math={`\\Sigma M_{support} = 0 \\implies M_a - \\sum (P_i \\cdot x_i) = 0`} />
                       <BlockMath math={`M_a = \\sum (P_i \\cdot x_i) = ${analysis.Ma.toFixed(2)} \\text{ kNm}`} />
-                    </div>
-                    <hr className="my-4 border-outline/10" />
-                    <p className="body-sm text-on-surface-variant mb-2">Resolving forces vertically to find vertical reaction at fixed origin (<InlineMath math="R_a" />):</p>
-                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
-                      <BlockMath math={`\\Sigma F_y = 0 \\implies R_a - \\sum P_i = 0`} />
-                      <BlockMath math={`R_a = \\sum P_i = ${analysis.Ra.toFixed(2)} \\text{ kN}`} />
                     </div>
                   </>
                 )}
@@ -617,36 +631,37 @@ export default function Beams() {
 
             <div className="space-y-6">
               <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
-                <h4 className="label-lg text-primary mb-4">2. Bending Moment & Deflection Method</h4>
-                <p className="body-sm text-on-surface-variant mb-2">The elastic curve <InlineMath math={"y(x)"} /> is resolved utilizing exact double-integration of the contiguous internal Bending Moment arrays guaranteeing universal robustness mapped across complex loading fields:</p>
-                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
-                  <BlockMath math={`\\theta(x) = \\int \\frac{M(x)}{EI} dx + C_1`} />
-                  <BlockMath math={`y(x) = \\int \\theta(x) dx + C_2`} />
-                </div>
-                <p className="body-sm text-on-surface-variant mt-3 mb-2">Where geometric boundaries {beamType === 'simply_supported' ? <><InlineMath math={"y(A) = 0"} /> and <InlineMath math={"y(B) = 0"} /></> : <><InlineMath math={"y(0) = 0"} /> and <InlineMath math={"y'(0) = 0"} /></>} extract integration constants dynamically isolating pure local displacement geometries independently:</p>
-                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
-                  {beamType === 'simply_supported' ? (
-                    <>
-                      <BlockMath math={`C_1 = \\frac{y_{unadj}(B) - y_{unadj}(A)}{B - A} = ${analysis.C1.toExponential(2)}`} />
-                      <BlockMath math={`C_2 = -y_{unadj}(A) - C_1(A) = ${analysis.C2.toExponential(2)}`} />
-                    </>
-                  ) : (
-                    <>
-                      <BlockMath math={`C_1 = 0 \\quad \\text{(Fixed Slope)}`} />
-                      <BlockMath math={`C_2 = 0 \\quad \\text{(Fixed Displacement)}`} />
-                    </>
-                  )}
-                </div>
-                <hr className="my-4 border-outline/10" />
-                <p className="body-sm text-on-surface-variant mb-2">With <InlineMath math={`EI = ${analysis.EI.toFixed(2)} \\text{ kN \\cdot m}^2`} /> yielding Absolute Operational Maxima limits within the boundary:</p>
-                <div className="flex gap-4 items-center">
-                  <div className="p-4 bg-tertiary/10 rounded-xl flex-1 text-center">
-                    <p className="label-sm text-tertiary mb-1">Max Moment (M)</p>
-                    <p className="text-xl font-bold text-tertiary">{analysis.maxMoment.toFixed(2)} <span className="text-xs opacity-50">kNm</span></p>
+                <h4 className="label-lg text-primary mb-4">2. Shear Force & Bending Moment Equations</h4>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm space-y-4">
+                  <div className="text-on-surface-variant body-sm mb-2">Consider, Shear force <InlineMath math="V(x)" />:</div>
+                  <BlockMath math={`V(x) = R_a - \\int q(x) dx`} />
+                  <BlockMath math={`V(0) = ${analysis.data[0]?.V.toFixed(2) || '0.00'} \\text{ kN}`} />
+                  <BlockMath math={`V(${length}) = ${analysis.data[analysis.data.length - 1]?.V.toFixed(2) || '0.00'} \\text{ kN}`} />
+                  <hr className="border-outline/10 my-4" />
+                  
+                  <div className="text-on-surface-variant body-sm mt-4 mb-2">Bending moment <InlineMath math="M(x)" /> mapping:</div>
+                  <BlockMath math={`M(x) = \\int V(x) dx`} />
+                  
+                  <div className="mt-4 p-4 bg-tertiary/10 rounded-xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-tertiary/5 w-full transform origin-left transition-transform group-hover:scale-x-105" />
+                    <div className="relative z-10">
+                      <BlockMath math={`\\frac{d M(x)}{dx} = 0 \\implies V(x) = 0`} />
+                      <p className="text-center mt-3 body-sm text-tertiary">
+                        at <kbd className="font-mono bg-tertiary/20 px-1.5 py-0.5 rounded text-tertiary">x = {analysis.maxMomentX.toFixed(2)}m</kbd> the bending moment is maximum.
+                      </p>
+                      <BlockMath math={`M_{max} = ${analysis.maxMoment.toFixed(2)} \\text{ kNm}`} />
+                    </div>
                   </div>
-                  <div className="p-4 bg-secondary/10 rounded-xl flex-1 text-center">
-                    <p className="label-sm text-secondary mb-1">Max Deflection (y)</p>
-                    <p className="text-xl font-bold text-secondary">{Math.abs(analysis.maxDeflection).toFixed(3)} <span className="text-xs opacity-50">mm</span></p>
+
+                  <div className="mt-4 p-4 bg-secondary/10 rounded-xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-secondary/5 w-full transform origin-left transition-transform group-hover:scale-x-105" />
+                    <div className="relative z-10">
+                      <BlockMath math={`y_{max} = \\iint \\frac{M(x)}{E I} dx^2`} />
+                      <p className="text-center mt-3 body-sm text-secondary">
+                        at <kbd className="font-mono bg-secondary/20 px-1.5 py-0.5 rounded text-secondary">x = {analysis.maxDefX.toFixed(2)}m</kbd> the highest deflection occurs.
+                      </p>
+                      <BlockMath math={`y_{max} = ${Math.abs(analysis.maxDeflection).toFixed(3)} \\text{ mm}`} />
+                    </div>
                   </div>
                 </div>
               </div>

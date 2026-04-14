@@ -8,15 +8,15 @@
     ],
     "rewrites": [
       {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "solids-backend",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
-        "has": [
-          {
-            "type": "host",
-            "value": "www.structuralsolver.com"
-          }
-        ],
-        "destination": "https://structuralsolver.com",
-        "type": 301
+        "destination": "/index.html"
       }
     ]
   }

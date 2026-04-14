@@ -14,33 +14,6 @@ import MainLayout from '../layouts/MainLayout';
 import { materialsService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import type { Material } from '../types/api';
-
-// Helper to fetch categories through the auth-injecting API layer
-import { auth } from '../lib/firebase';
-
-async function fetchCategoriesWithAuth(): Promise<string[]> {
-  const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${BASE_URL}/api/material-categories`, { headers });
-  if (!res.ok) throw new Error(`Categories fetch failed: ${res.status}`);
-  return res.json();
-}
-
-async function fetchMaterialsWithAuth(search: string, category: string): Promise<Material[]> {
-  const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(
-    `${BASE_URL}/api/materials?search=${encodeURIComponent(search)}&category=${encodeURIComponent(category)}`,
-    { headers }
-  );
-  if (!res.ok) throw new Error(`Materials fetch failed: ${res.status}`);
-  return res.json();
-}
-
 export default function Materials() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -48,17 +21,32 @@ export default function Materials() {
   const [materialData, setMaterialData] = useState<Material[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
 
+  const [allMaterials, setAllMaterials] = useState<Material[]>([]);
+
   useEffect(() => {
-    fetchCategoriesWithAuth()
-      .then(data => setCategories(data))
-      .catch(err => console.error('[Materials] Categories fetch failed:', err));
+    materialsService.list()
+      .then(data => {
+        setAllMaterials(data);
+        const cats = Array.from(new Set(data.map(m => m.category))).sort();
+        setCategories(['All', ...cats]);
+      })
+      .catch(err => console.error('[Materials] Fetch materials failed:', err));
   }, []);
 
   useEffect(() => {
-    fetchMaterialsWithAuth(search, category)
-      .then(data => setMaterialData(data))
-      .catch(err => console.error('[Materials] Fetch materials failed:', err));
-  }, [search, category]);
+    let filtered = allMaterials;
+    if (category !== 'All') {
+      filtered = filtered.filter(m => m.category === category);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(m => 
+        m.name.toLowerCase().includes(q) || 
+        m.category.toLowerCase().includes(q)
+      );
+    }
+    setMaterialData(filtered);
+  }, [search, category, allMaterials]);
 
   const getState = useCallback(
     () => ({ search, category }),

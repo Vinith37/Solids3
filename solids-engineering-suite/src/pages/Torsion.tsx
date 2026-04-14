@@ -1,12 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, Calculator, Info, Save, Share2, Zap, Box } from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Save, Share2, Zap, Box, Hash } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import { torsionService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { TorsionInput, TorsionResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
+import 'katex/dist/katex.min.css';
+import { BlockMath, InlineMath } from 'react-katex';
 
 type SectionType = 'solid-circular' | 'hollow-circular' | 'rectangular';
 
@@ -91,13 +95,13 @@ export default function Torsion() {
                 Section Geometry
               </h3>
               
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">Cross-Section Type</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant mb-2.5">Cross-Section Type</label>
                   <select 
                     value={section}
                     onChange={(e) => setSection(e.target.value as SectionType)}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-sans text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
+                    className="w-full px-5 py-3.5 bg-surface-container-highest rounded-2xl outline-none text-on-surface text-sm focus:ring-2 ring-primary/20 transition-all appearance-none border border-outline/5"
                   >
                     <option value="solid-circular">Solid Circular</option>
                     <option value="hollow-circular">Hollow Circular</option>
@@ -106,29 +110,19 @@ export default function Torsion() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block label-sm text-on-surface-variant mb-3">
-                      {section === 'rectangular' ? 'Width (mm)' : 'Outer Dia (mm)'}
-                    </label>
-                    <input 
-                      type="number" 
-                      value={d1} 
-                      onChange={(e) => setD1(Number(e.target.value))}
-                      className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                    />
-                  </div>
+                  <UnitInput
+                    label={section === 'rectangular' ? 'Width' : 'Outer Diameter'}
+                    value={d1}
+                    onChange={setD1}
+                    unitType="smallLength"
+                  />
                   {section !== 'solid-circular' && (
-                    <div>
-                      <label className="block label-sm text-on-surface-variant mb-3">
-                        {section === 'rectangular' ? 'Height (mm)' : 'Inner Dia (mm)'}
-                      </label>
-                      <input 
-                        type="number" 
-                        value={d2} 
-                        onChange={(e) => setD2(Number(e.target.value))}
-                        className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                      />
-                    </div>
+                    <UnitInput
+                      label={section === 'rectangular' ? 'Height' : 'Inner Diameter'}
+                      value={d2}
+                      onChange={setD2}
+                      unitType="smallLength"
+                    />
                   )}
                 </div>
               </div>
@@ -140,34 +134,25 @@ export default function Torsion() {
                 Loading & Material
               </h3>
               
-              <div className="space-y-6">
-                <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">Applied Torque (Nm)</label>
-                  <input 
-                    type="number" 
-                    value={torque} 
-                    onChange={(e) => setTorque(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">Shaft Length (m)</label>
-                  <input 
-                    type="number" 
-                    value={length} 
-                    onChange={(e) => setLength(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-sm text-on-surface-variant mb-3">Shear Modulus G (GPa)</label>
-                  <input 
-                    type="number" 
-                    value={modulus} 
-                    onChange={(e) => setModulus(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
+              <div className="space-y-5">
+                <UnitInput
+                  label="Applied Torque"
+                  value={torque}
+                  onChange={setTorque}
+                  unitType="torque"
+                />
+                <UnitInput
+                  label="Shaft Length"
+                  value={length}
+                  onChange={setLength}
+                  unitType="length"
+                />
+                <UnitInput
+                  label="Shear Modulus (G)"
+                  value={modulus}
+                  onChange={setModulus}
+                  unitType="modulus"
+                />
               </div>
             </div>
           </div>
@@ -181,10 +166,7 @@ export default function Torsion() {
                 <div className="space-y-8 md:space-y-10">
                   <div>
                     <p className="label-sm text-on-surface-variant mb-3">Max Shear Stress</p>
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-4xl md:text-6xl font-black text-on-surface">{r.maxShear.toFixed(2)}</span>
-                      <span className="text-xl md:text-2xl font-bold text-on-surface-variant">MPa</span>
-                    </div>
+                    <UnitDisplay value={r.maxShear} unitType="stress" precision={2} valueClassName="text-4xl md:text-6xl font-black text-on-surface" />
                   </div>
                   
                   <div>
@@ -198,7 +180,7 @@ export default function Torsion() {
 
                   <div className="pt-8 border-t border-outline/10">
                     <p className="label-sm text-on-surface-variant mb-2">Polar Moment of Inertia (J)</p>
-                    <p className="text-xl md:headline-md text-on-surface">{r.J.toFixed(4)} cm⁴</p>
+                    <UnitDisplay value={r.J} unitType="inertia" precision={4} valueClassName="text-xl md:headline-md text-on-surface" />
                   </div>
                 </div>
 
@@ -240,6 +222,66 @@ export default function Torsion() {
             </div>
           </div>
         </div>
+
+        {/* Detailed Calculation Section */}
+        <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] mt-4 lg:mt-8 ambient-shadow relative overflow-hidden">
+          <h3 className="text-xl md:headline-sm text-on-surface mb-6 md:mb-8 flex items-center gap-3 relative z-10"><Hash className="w-6 h-6 text-primary" />Detailed Calculation Steps</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative z-10">
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">1. Geometric Properties</h4>
+                {section === 'solid-circular' && (
+                  <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                    <p className="body-sm text-on-surface-variant mb-2">For a solid circular cross-section, the polar moment of inertia is purely a function of the external radius:</p>
+                    <BlockMath math={`J = \\frac{\\pi \\cdot d^4}{32} \\implies J = \\frac{\\pi \\cdot (${d1})^4}{32}`} />
+                    <BlockMath math={`J = ${r.J.toFixed(4)} \\text{ cm}^4`} />
+                  </div>
+                )}
+                {section === 'hollow-circular' && (
+                  <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                    <p className="body-sm text-on-surface-variant mb-2">For a hollow circular section, the polar moment is the difference between outer and inner envelopes:</p>
+                    <BlockMath math={`J = \\frac{\\pi \\cdot (d_{o}^4 - d_{i}^4)}{32} = \\frac{\\pi \\cdot (${d1}^4 - ${d2}^4)}{32}`} />
+                    <BlockMath math={`J = ${r.J.toFixed(4)} \\text{ cm}^4`} />
+                  </div>
+                )}
+                {section === 'rectangular' && (
+                  <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                    <p className="body-sm text-on-surface-variant mb-2">For a rectangular section, exact analytical solutions use a constant <InlineMath math="\beta" />. Under typical long bounding limits, we approximate using <InlineMath math="\beta \approx 0.208" />:</p>
+                    <BlockMath math={`J \\approx \\beta \\cdot \\left(\\text{long}\\right) \\cdot \\left(\\text{short}\\right)^3`} />
+                    <BlockMath math={`J = ${r.J.toFixed(4)} \\text{ cm}^4`} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">2. Kinematic & Stress Relationships</h4>
+                <div className="space-y-8">
+                  <div>
+                    <p className="body-sm text-on-surface-variant mb-2 font-bold uppercase tracking-widest text-[10px]">Maximum Shear Stress</p>
+                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                      {section === 'rectangular' ? (
+                        <BlockMath math={`\\tau_{max} = \\frac{T}{\\beta \\cdot a \\cdot b^2} = ${r.maxShear.toFixed(3)} \\text{ MPa}`} />
+                      ) : (
+                        <BlockMath math={`\\tau_{max} = \\frac{T \\cdot r}{J} = ${r.maxShear.toFixed(3)} \\text{ MPa}`} />
+                      )}
+                    </div>
+                  </div>
+                  <hr className="border-outline/10" />
+                  <div>
+                    <p className="body-sm text-on-surface-variant mb-2 font-bold uppercase tracking-widest text-[10px]">Rotational Twist Element</p>
+                    <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                      <BlockMath math={`\\phi = \\frac{T \\cdot L}{G \\cdot J}`} />
+                      <BlockMath math={`\\phi = ${r.angleRad.toFixed(5)} \\text{ rad } \\left(${r.angleDeg.toFixed(3)}^{\\circ}\\right)`} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </MainLayout>
   );

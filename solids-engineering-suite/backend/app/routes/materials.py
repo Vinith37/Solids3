@@ -6,11 +6,8 @@ from fastapi import APIRouter, Request, Depends
 from typing import Optional
 from ..data.materials import materials_db
 from ..data.ashby import ashby_materials_db
-from ..auth import verify_firebase_token
 
-router = APIRouter(
-    dependencies=[Depends(verify_firebase_token)]
-)
+router = APIRouter()
 
 
 @router.get("/api/materials")

@@ -15,6 +15,8 @@ import { dynamicService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { DynamicInput, DynamicResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
 
 export default function DynamicLoading() {
   const navigate = useNavigate();
@@ -86,34 +88,25 @@ export default function DynamicLoading() {
                 Impact Parameters
               </h3>
               
-              <div className="space-y-6">
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Falling Mass (kg)</label>
-                  <input 
-                    type="number" 
-                    value={mass} 
-                    onChange={(e) => setMass(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Drop Height (m)</label>
-                  <input 
-                    type="number" 
-                    value={height} 
-                    onChange={(e) => setHeight(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">System Stiffness (N/m)</label>
-                  <input 
-                    type="number" 
-                    value={stiffness} 
-                    onChange={(e) => setStiffness(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
+              <div className="space-y-5">
+                <UnitInput
+                  label="Falling Mass"
+                  value={mass}
+                  onChange={setMass}
+                  unitType="mass"
+                />
+                <UnitInput
+                  label="Drop Height"
+                  value={height}
+                  onChange={setHeight}
+                  unitType="length"
+                />
+                <UnitInput
+                  label="System Stiffness"
+                  value={stiffness}
+                  onChange={setStiffness}
+                  unitType="stiffness"
+                />
               </div>
             </div>
 
@@ -123,7 +116,7 @@ export default function DynamicLoading() {
                   <Info className="w-5 h-5 text-primary shrink-0" />
                 </div>
                 <p className="body-sm text-on-surface-variant leading-relaxed">
-                  The <strong>Impact Factor</strong> represents the ratio of dynamic stress to static stress. For a sudden load (h=0), the factor is 2.
+                  The <strong className="text-on-surface">Impact Factor</strong> represents the ratio of dynamic stress to static stress. For a sudden load (h=0), the factor is 2.
                 </p>
               </div>
             </div>
@@ -153,7 +146,12 @@ export default function DynamicLoading() {
 
                   <div className="pt-6 md:pt-8 border-t border-outline/10">
                     <p className="label-sm text-on-surface-variant mb-2">Max Dynamic Force</p>
-                    <p className="text-xl md:headline-md text-on-surface">{results.dynamicForce.toFixed(1)} N</p>
+                    <UnitDisplay value={results.dynamicForce / 1000} unitType="force" precision={1} valueClassName="text-xl md:headline-md text-on-surface" />
+                  </div>
+
+                  <div className="pt-4 border-t border-outline/10">
+                    <p className="label-sm text-on-surface-variant mb-2">Static Deflection</p>
+                    <UnitDisplay value={results.deltaSt} unitType="deflection" precision={2} valueClassName="text-xl md:headline-md text-on-surface" />
                   </div>
                 </div>
 

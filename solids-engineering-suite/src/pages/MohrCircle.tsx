@@ -6,6 +6,8 @@ import { mohrService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { MohrCircleInput, MohrCircleResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -52,14 +54,12 @@ export default function MohrCircle() {
   // Dynamic SVG Bound Mapping Logic
   const svgSize = 400;
   
-  // Calculate bounding box bounds to fit geometry accurately on screen
-  const startX = Math.min(0, calculations.p3); // ensure τ axis is shown
-  const endX = Math.max(0, calculations.p1);   // ensure 0 axis is shown
+  const startX = Math.min(0, calculations.p3);
+  const endX = Math.max(0, calculations.p1);
   const dataMidX = (startX + endX) / 2;
   
-  // The max required span determines our global scale
   const maxSpan = Math.max(endX - startX, calculations.absMaxShear * 2) * 1.2 || 100;
-  const scale = (svgSize - 80) / maxSpan; // 80px total spatial padding around the envelope
+  const scale = (svgSize - 80) / maxSpan;
   const mapX = (x: number) => (svgSize / 2) + (x - dataMidX) * scale;
   const mapY = (y: number) => (svgSize / 2) - y * scale;
 
@@ -125,26 +125,33 @@ export default function MohrCircle() {
                 <button onClick={() => setIs3D(true)} className={`flex-1 py-3 text-center label-sm relative z-10 transition-colors ${is3D ? 'text-on-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'}`}>3D State</button>
               </div>
 
-              <div className="space-y-6">
-                {[
-                  { id: 'sx', label: <>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σₓ</span> (MPa)</>, value: sigmaX, setter: setSigmaX, show: true },
-                  { id: 'sy', label: <>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σy</span> (MPa)</>, value: sigmaY, setter: setSigmaY, show: true },
-                  { id: 'sz', label: <>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σz</span> (MPa)</>, value: sigmaZ, setter: setSigmaZ, show: is3D },
-                  { id: 'txy', label: <>Shear Stress <span className="normal-case lowercase font-mono tracking-tighter">τxy</span> (MPa)</>, value: tauXY, setter: setTauXY, show: true },
-                ].filter(i=>i.show).map((input) => (
-                  <div key={input.id}>
-                    <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3">{input.label}</label>
-                    <div className="relative group">
-                      <input 
-                        type="number" 
-                        value={input.value} 
-                        onChange={(e) => input.setter(Number(e.target.value))}
-                        className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all border border-outline/5" 
-                      />
-                      <div className="absolute bottom-0 left-6 right-6 h-0.5 bg-primary scale-x-0 group-focus-within:scale-x-100 transition-transform origin-left" />
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-5">
+                <UnitInput
+                  label={<>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σₓ</span></>}
+                  value={sigmaX}
+                  onChange={setSigmaX}
+                  unitType="stress"
+                />
+                <UnitInput
+                  label={<>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σy</span></>}
+                  value={sigmaY}
+                  onChange={setSigmaY}
+                  unitType="stress"
+                />
+                {is3D && (
+                  <UnitInput
+                    label={<>Normal Stress <span className="normal-case lowercase font-mono tracking-tighter">σz</span></>}
+                    value={sigmaZ}
+                    onChange={setSigmaZ}
+                    unitType="stress"
+                  />
+                )}
+                <UnitInput
+                  label={<>Shear Stress <span className="normal-case lowercase font-mono tracking-tighter">τxy</span></>}
+                  value={tauXY}
+                  onChange={setTauXY}
+                  unitType="stress"
+                />
               </div>
             </div>
           </div>
@@ -166,8 +173,8 @@ export default function MohrCircle() {
                 <div className="absolute inset-0 opacity-10 pointer-events-none bg-engineering-grid" />
                 <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12">
                   <svg className="w-full h-full max-w-[550px]" viewBox={`0 0 ${svgSize} ${svgSize}`}>
-                    <line x1="0" y1={originY} x2={svgSize} y2={originY} stroke="black" strokeWidth="2.5" />
-                    <line x1={originX} y1="0" x2={originX} y2={svgSize} stroke="black" strokeWidth="2.5" />
+                    <line x1="0" y1={originY} x2={svgSize} y2={originY} stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
+                    <line x1={originX} y1="0" x2={originX} y2={svgSize} stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
                     <text x={svgSize - 30} y={originY - 15} fill="var(--color-on-surface-variant)" fontSize="16" fontWeight="700" className="label-sm normal-case lowercase font-mono">σ</text>
                     <text x={originX + 15} y="30" fill="var(--color-on-surface-variant)" fontSize="16" fontWeight="700" className="label-sm normal-case lowercase font-mono">τ</text>
 
@@ -208,9 +215,21 @@ export default function MohrCircle() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mt-8 md:mt-10">
-                <div className="bg-surface-container-high p-4 md:p-6 rounded-2xl"><p className="label-sm text-on-surface-variant mb-2">Center (C)</p><p className="text-xl md:text-2xl font-bold text-on-surface">{calculations.avg.toFixed(1)} <span className="label-sm opacity-40">MPa</span></p></div>
-                <div className="bg-surface-container-high p-4 md:p-6 rounded-2xl"><p className="label-sm text-on-surface-variant mb-2">Radius (R)</p><p className="text-xl md:text-2xl font-bold text-on-surface">{calculations.radius.toFixed(1)} <span className="label-sm opacity-40">MPa</span></p></div>
-                <div className="bg-primary/10 p-4 md:p-6 rounded-2xl relative overflow-hidden group"><p className="label-sm text-primary mb-2 flex flex-col gap-1"><span className="flex items-center gap-1">Abs. Max Shear <span className="normal-case lowercase font-mono">τₘₐₓ</span></span>{is3D && <span className="text-[10px] text-primary/60">(Absolute Over 3 Planes)</span>}</p><p className="text-xl md:text-2xl font-bold text-primary">{Math.abs(calculations.absMaxShear).toFixed(1)} <span className="label-sm opacity-40">MPa</span></p></div>
+                <div className="bg-surface-container-high p-4 md:p-6 rounded-2xl">
+                  <p className="label-sm text-on-surface-variant mb-2">Center (C)</p>
+                  <UnitDisplay value={calculations.avg} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-bold text-on-surface" />
+                </div>
+                <div className="bg-surface-container-high p-4 md:p-6 rounded-2xl">
+                  <p className="label-sm text-on-surface-variant mb-2">Radius (R)</p>
+                  <UnitDisplay value={calculations.radius} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-bold text-on-surface" />
+                </div>
+                <div className="bg-primary/10 p-4 md:p-6 rounded-2xl relative overflow-hidden group">
+                  <p className="label-sm text-primary mb-2 flex flex-col gap-1">
+                    <span className="flex items-center gap-1">Abs. Max Shear <span className="normal-case lowercase font-mono">τₘₐₓ</span></span>
+                    {is3D && <span className="text-[10px] text-primary/60">(Absolute Over 3 Planes)</span>}
+                  </p>
+                  <UnitDisplay value={Math.abs(calculations.absMaxShear)} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-bold text-primary" />
+                </div>
               </div>
             </div>
           </div>

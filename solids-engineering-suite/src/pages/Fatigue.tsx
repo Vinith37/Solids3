@@ -15,6 +15,9 @@ import { fatigueService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { FatigueInput, FatigueResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
+import { getDefaultUnitKey, fromBaseUnit, findUnit } from '../utils/units';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -25,6 +28,7 @@ export default function Fatigue() {
   const [se, setSe] = useState<number>(300); // MPa
   const [sigmaA, setSigmaA] = useState<number>(100); // MPa (Alternating)
   const [sigmaM, setSigmaM] = useState<number>(150); // MPa (Mean)
+  const [stressUnit, setStressUnit] = useState(getDefaultUnitKey('stress'));
 
   // --- Hooks ---
   const analysisInput: FatigueInput = { su, sy, se, sa: sigmaA, sm: sigmaM };
@@ -91,6 +95,9 @@ export default function Fatigue() {
     return `M ${points.join(' L ')}`;
   };
 
+  // Unit label for the axis
+  const unitLabel = findUnit('stress', stressUnit).label;
+
   return (
     <MainLayout>
       <div className="space-y-12 pb-20">
@@ -131,34 +138,28 @@ export default function Fatigue() {
                 Material Properties
               </h3>
               
-              <div className="space-y-6">
-                <div>
-                  <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3">Ultimate Strength Sᵤ (MPa)</label>
-                  <input 
-                    type="number" 
-                    value={su} 
-                    onChange={(e) => setSu(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-xl text-on-surface focus:ring-2 ring-primary/20 transition-all border border-outline/5" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3">Yield Strength Sᵧ (MPa)</label>
-                  <input 
-                    type="number" 
-                    value={sy} 
-                    onChange={(e) => setSy(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-xl text-on-surface focus:ring-2 ring-primary/20 transition-all border border-outline/5" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3">Endurance Limit Sₑ (MPa)</label>
-                  <input 
-                    type="number" 
-                    value={se} 
-                    onChange={(e) => setSe(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-xl text-on-surface focus:ring-2 ring-primary/20 transition-all border border-outline/5" 
-                  />
-                </div>
+              <div className="space-y-5">
+                <UnitInput
+                  label={<>Ultimate Strength S<sub className="lowercase">u</sub></>}
+                  value={su}
+                  onChange={setSu}
+                  unitType="stress"
+                  defaultUnit={stressUnit}
+                />
+                <UnitInput
+                  label={<>Yield Strength S<sub className="lowercase">y</sub></>}
+                  value={sy}
+                  onChange={setSy}
+                  unitType="stress"
+                  defaultUnit={stressUnit}
+                />
+                <UnitInput
+                  label={<>Endurance Limit S<sub className="lowercase">e</sub></>}
+                  value={se}
+                  onChange={setSe}
+                  unitType="stress"
+                  defaultUnit={stressUnit}
+                />
               </div>
             </div>
 
@@ -168,29 +169,21 @@ export default function Fatigue() {
                 Stress State
               </h3>
               
-              <div className="space-y-6">
-                <div>
-                  <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3 flex items-center gap-1.5">
-                    MEAN STRESS <span className="normal-case tracking-normal text-base mt-[-2px]"><InlineMath math="\sigma_m" /></span> (MPA)
-                  </label>
-                  <input 
-                    type="number" 
-                    value={sigmaM} 
-                    onChange={(e) => setSigmaM(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3 flex items-center gap-1.5">
-                    ALTERNATING STRESS <span className="normal-case tracking-normal text-base mt-[-2px]"><InlineMath math="\sigma_a" /></span> (MPA)
-                  </label>
-                  <input 
-                    type="number" 
-                    value={sigmaA} 
-                    onChange={(e) => setSigmaA(Number(e.target.value))}
-                    className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
+              <div className="space-y-5">
+                <UnitInput
+                  label={<>Mean Stress <InlineMath math="\sigma_m" /></>}
+                  value={sigmaM}
+                  onChange={setSigmaM}
+                  unitType="stress"
+                  defaultUnit={stressUnit}
+                />
+                <UnitInput
+                  label={<>Alternating Stress <InlineMath math="\sigma_a" /></>}
+                  value={sigmaA}
+                  onChange={setSigmaA}
+                  unitType="stress"
+                  defaultUnit={stressUnit}
+                />
               </div>
             </div>
           </div>
@@ -249,13 +242,13 @@ export default function Fatigue() {
                 <div className="relative w-full max-w-[800px] aspect-[4/3] md:aspect-[3/2] overflow-visible mt-4">
                   <svg viewBox={`0 0 ${svgSize} ${svgSize}`} className="w-full h-full overflow-visible">
                     {/* Axes */}
-                    <line x1={originX} y1={originY} x2={svgSize - 10} y2={originY} stroke="black" strokeWidth="2.5" opacity="1" />
-                    <line x1={originX} y1={originY} x2={originX} y2="10" stroke="black" strokeWidth="2.5" opacity="1" />
+                    <line x1={originX} y1={originY} x2={svgSize - 10} y2={originY} stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
+                    <line x1={originX} y1={originY} x2={originX} y2="10" stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
                     
                     {/* Axis Labels */}
-                    <text x={svgSize - 10} y={originY + 25} fill="var(--color-on-surface)" fontSize="16" className="font-mono font-bold">σ_m (MPa)</text>
-                    <text x={originX - 45} y="20" fill="var(--color-on-surface)" fontSize="16" className="font-mono font-bold">σ_a</text>
-                    <text x={originX - 45} y="40" fill="var(--color-on-surface)" fontSize="14" className="font-mono font-medium">(MPa)</text>
+                    <text x={svgSize - 10} y={originY + 25} fill="var(--color-on-surface)" fontSize="14" className="font-mono font-bold">σ_m ({unitLabel})</text>
+                    <text x={originX - 45} y="20" fill="var(--color-on-surface)" fontSize="14" className="font-mono font-bold">σ_a</text>
+                    <text x={originX - 45} y="38" fill="var(--color-on-surface-variant)" fontSize="12" className="font-mono">({unitLabel})</text>
 
                     {/* Goodman */}
                     <path d={generateGoodmanPath()} fill="none" stroke="var(--color-primary)" strokeWidth="2.5" />
@@ -273,7 +266,7 @@ export default function Fatigue() {
 
               <div className="bg-primary/5 p-6 md:p-8 rounded-[1.5rem] mt-8 flex flex-col md:flex-row gap-4 border border-primary/10 w-full items-start md:items-center">
                 <Info className="w-6 h-6 text-primary shrink-0" />
-                <p className="body-md text-on-surface leading-relaxed">
+                <p className="body-md text-on-surface-variant leading-relaxed">
                   The Goodman criteria is the most common for ductile materials. Soderberg is the most conservative as it uses Yield Strength instead of Ultimate Strength.
                 </p>
               </div>

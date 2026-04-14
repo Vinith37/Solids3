@@ -7,7 +7,8 @@ import {
   Share2,
   Circle,
   Target,
-  AlertTriangle
+  AlertTriangle,
+  Hash
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
@@ -15,6 +16,10 @@ import { thinCylinderService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { ThinCylinderInput, ThinCylinderResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
+import 'katex/dist/katex.min.css';
+import { BlockMath, InlineMath } from 'react-katex';
 
 export default function ThinCylinders() {
   const navigate = useNavigate();
@@ -89,40 +94,31 @@ export default function ThinCylinders() {
                 Vessel Properties
               </h3>
               
-              <div className="space-y-6">
+              <div className="space-y-5">
+                <UnitInput
+                  label="Inner Radius"
+                  value={innerRadius}
+                  onChange={setInnerRadius}
+                  unitType="smallLength"
+                />
+                <UnitInput
+                  label="Wall Thickness"
+                  value={wallThickness}
+                  onChange={setWallThickness}
+                  unitType="smallLength"
+                />
+                <UnitInput
+                  label="Internal Pressure"
+                  value={pressure}
+                  onChange={setPressure}
+                  unitType="pressure"
+                />
                 <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Inner Radius (mm)</label>
-                  <input 
-                    type="number" 
-                    value={innerRadius} 
-                    onChange={(e) => setInnerRadius(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Wall Thickness (mm)</label>
-                  <input 
-                    type="number" 
-                    value={wallThickness}
-                    onChange={(e) => setWallThickness(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">Internal Pressure (MPa)</label>
-                  <input 
-                    type="number" 
-                    value={pressure} 
-                    onChange={(e) => setPressure(Number(e.target.value))}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface font-mono focus:ring-2 ring-primary/20 transition-all" 
-                  />
-                </div>
-                <div>
-                  <label className="label-sm text-on-surface-variant block mb-3">End Condition</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.05em] text-on-surface-variant mb-2.5">End Condition</label>
                   <select 
                     value={endCondition}
                     onChange={(e) => setEndCondition(e.target.value)}
-                    className="w-full px-5 py-3 bg-surface-container-highest rounded-2xl outline-none text-on-surface focus:ring-2 ring-primary/20 transition-all appearance-none"
+                    className="w-full px-5 py-3.5 bg-surface-container-highest rounded-2xl outline-none text-on-surface text-sm focus:ring-2 ring-primary/20 transition-all appearance-none border border-outline/5"
                   >
                     <option value="closed">Closed Ends (Capped)</option>
                     <option value="open">Open Ends</option>
@@ -156,11 +152,11 @@ export default function ThinCylinders() {
                 {/* Primary result */}
                 <div className="mb-8 md:mb-12">
                   <div className="flex items-baseline gap-4 mb-2">
-                    <span className="text-4xl md:text-6xl font-black text-primary">{results.hoopStress.toFixed(1)}</span>
-                    <div>
-                      <span className="text-xl md:text-2xl font-bold text-on-surface">Hoop Stress σ<sub>h</sub></span>
-                      <p className="label-sm text-on-surface-variant uppercase tracking-wider mt-1">Circumferential stress in MPa</p>
-                    </div>
+                    <UnitDisplay value={results.hoopStress} unitType="stress" precision={1} valueClassName="text-4xl md:text-6xl font-black text-primary" />
+                  </div>
+                  <div>
+                    <span className="text-xl md:text-2xl font-bold text-on-surface">Hoop Stress σ<sub>h</sub></span>
+                    <p className="label-sm text-on-surface-variant uppercase tracking-wider mt-1">Circumferential stress</p>
                   </div>
                 </div>
 
@@ -173,8 +169,7 @@ export default function ThinCylinders() {
                     transition={{ delay: 0.1 }}
                   >
                     <p className="label-sm text-on-surface-variant mb-2">Longitudinal σ<sub>l</sub></p>
-                    <p className="text-xl md:text-2xl font-black text-on-surface">{results.longStress.toFixed(1)}</p>
-                    <p className="text-[10px] text-on-surface-variant mt-1">MPa</p>
+                    <UnitDisplay value={results.longStress} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-black text-on-surface" />
                   </motion.div>
 
                   <motion.div 
@@ -184,8 +179,7 @@ export default function ThinCylinders() {
                     transition={{ delay: 0.2 }}
                   >
                     <p className="label-sm text-on-surface-variant mb-2">Von Mises σ<sub>v</sub></p>
-                    <p className="text-xl md:text-2xl font-black text-on-surface">{results.vonMises.toFixed(1)}</p>
-                    <p className="text-[10px] text-on-surface-variant mt-1">MPa</p>
+                    <UnitDisplay value={results.vonMises} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-black text-on-surface" />
                   </motion.div>
 
                   <motion.div 
@@ -195,8 +189,7 @@ export default function ThinCylinders() {
                     transition={{ delay: 0.3 }}
                   >
                     <p className="label-sm text-on-surface-variant mb-2">Max Shear τ<sub>max</sub></p>
-                    <p className="text-xl md:text-2xl font-black text-on-surface">{results.maxShear.toFixed(1)}</p>
-                    <p className="text-[10px] text-on-surface-variant mt-1">MPa</p>
+                    <UnitDisplay value={results.maxShear} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-black text-on-surface" />
                   </motion.div>
 
                   <motion.div 
@@ -206,8 +199,7 @@ export default function ThinCylinders() {
                     transition={{ delay: 0.4 }}
                   >
                     <p className="label-sm text-on-surface-variant mb-2">Radial σ<sub>r</sub></p>
-                    <p className="text-xl md:text-2xl font-black text-on-surface">{results.radialStress.toFixed(1)}</p>
-                    <p className="text-[10px] text-on-surface-variant mt-1">MPa</p>
+                    <UnitDisplay value={results.radialStress} unitType="stress" precision={1} valueClassName="text-xl md:text-2xl font-black text-on-surface" />
                   </motion.div>
 
                   <motion.div 
@@ -248,6 +240,58 @@ export default function ThinCylinders() {
             </div>
           </div>
         </div>
+
+        {/* Detailed Calculation Section */}
+        <div className="bg-surface-container-low p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] mt-4 lg:mt-8 ambient-shadow relative overflow-hidden">
+          <h3 className="text-xl md:headline-sm text-on-surface mb-6 md:mb-8 flex items-center gap-3 relative z-10"><Hash className="w-6 h-6 text-primary" />Detailed Calculation Steps</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 relative z-10">
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">1. Thin-Wall Verification</h4>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <p className="body-sm text-on-surface-variant mb-2">Check applicability of thin-wall assumption (<InlineMath math="r/t \ge 10" />):</p>
+                  <BlockMath math={`\\text{Ratio} = \\frac{r}{t} = \\frac{${innerRadius}}{${wallThickness}} = ${results.ratio.toFixed(1)}`} />
+                  <p className={`body-sm font-bold mt-2 text-center ${results.ratio >= 10 ? "text-primary" : "text-amber-500"}`}>
+                    {results.ratio >= 10 ? "Assumption is Valid" : "Warning: Thick cylinder analysis is recommended"}
+                  </p>
+                </div>
+                <hr className="border-outline/10 my-6" />
+                <h4 className="label-lg text-primary mb-4">2. Principal Stresses</h4>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <p className="body-sm text-on-surface-variant mb-2">Hoop (Circumferential) Stress:</p>
+                  <BlockMath math={`\\sigma_h = \\frac{p \\cdot r}{t} = \\frac{${pressure} \\cdot ${innerRadius}}{${wallThickness}} = ${results.hoopStress.toFixed(1)} \\text{ MPa}`} />
+                  <p className="body-sm text-on-surface-variant mt-4 mb-2">Longitudinal (Axial) Stress:</p>
+                  {endCondition === 'closed' ? (
+                    <BlockMath math={`\\sigma_l = \\frac{p \\cdot r}{2t} = \\frac{${pressure} \\cdot ${innerRadius}}{2(${wallThickness})} = ${results.longStress.toFixed(1)} \\text{ MPa}`} />
+                  ) : (
+                    <BlockMath math={`\\sigma_l = 0 \\text{ MPa (Open Ends)}`} />
+                  )}
+                  <p className="body-sm text-on-surface-variant mt-4 mb-2">Radial Stress (Inner surface approximation):</p>
+                  <BlockMath math={`\\sigma_r \\approx -\\frac{p}{2} = -\\frac{${pressure}}{2} = ${results.radialStress.toFixed(1)} \\text{ MPa}`} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-surface-container-highest/50 p-6 rounded-2xl border border-outline/5 h-full">
+                <h4 className="label-lg text-primary mb-4">3. Comparative Failure Criteria</h4>
+                <p className="body-sm text-on-surface-variant mb-4 font-bold uppercase tracking-widest text-[10px]">Maximum Shear Stress (Tresca)</p>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <BlockMath math={`\\tau_{max} = \\frac{\\sigma_h - \\sigma_l}{2}`} />
+                  <BlockMath math={`\\tau_{max} = \\frac{${results.hoopStress.toFixed(1)} - ${results.longStress.toFixed(1)}}{2} = ${results.maxShear.toFixed(1)} \\text{ MPa}`} />
+                </div>
+                <hr className="border-outline/10 my-4" />
+                <p className="body-sm text-on-surface-variant mb-4 font-bold uppercase tracking-widest text-[10px]">Von Mises (Distortion Energy)</p>
+                <div className="overflow-x-auto text-on-surface pb-2 text-sm">
+                  <BlockMath math={`\\sigma_{vm} = \\sqrt{\\sigma_h^2 - \\sigma_h\\sigma_l + \\sigma_l^2}`} />
+                  <BlockMath math={`\\sigma_{vm} = \\sqrt{(${results.hoopStress.toFixed(1)})^2 - (${results.hoopStress.toFixed(1)})(${results.longStress.toFixed(1)}) + (${results.longStress.toFixed(1)})^2}`} />
+                  <BlockMath math={`\\sigma_{vm} = ${results.vonMises.toFixed(1)} \\text{ MPa}`} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </MainLayout>
   );

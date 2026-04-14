@@ -7,6 +7,8 @@ import { failureService } from '../services/api';
 import { useCalculation } from '../hooks/useCalculation';
 import { useAnalysis } from '../hooks/useAnalysis';
 import type { FailureTheoriesInput, FailureTheoriesResult } from '../types/api';
+import UnitInput from '../components/UnitInput';
+import UnitDisplay from '../components/UnitDisplay';
 import 'katex/dist/katex.min.css';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -127,26 +129,31 @@ export default function FailureTheories() {
                 Parameters
               </h3>
               
-              <div className="space-y-6">
-                {[
-                  { id: 'sx', label: <span className="flex items-center gap-1.5">NORMAL STRESS <span className="normal-case tracking-normal text-base mt-[-2px]"><InlineMath math="\sigma_x" /></span> (MPA)</span>, value: sigmaX, setter: setSigmaX },
-                  { id: 'sy', label: <span className="flex items-center gap-1.5">NORMAL STRESS <span className="normal-case tracking-normal text-base mt-[-2px]"><InlineMath math="\sigma_y" /></span> (MPA)</span>, value: sigmaY, setter: setSigmaY },
-                  { id: 'txy', label: <span className="flex items-center gap-1.5">SHEAR STRESS <span className="normal-case tracking-normal text-base mt-[-2px]"><InlineMath math="\tau_{xy}" /></span> (MPA)</span>, value: tauXY, setter: setTauXY },
-                  { id: 'syield', label: <span className="flex items-center gap-1.5">YIELD STRENGTH S<sub className="lowercase ml-[1px]">y</sub> (MPA)</span>, value: sy, setter: setSy },
-                ].map((input) => (
-                  <div key={input.id}>
-                    <label className="block label-xs tracking-widest uppercase font-bold text-on-surface-variant mb-3">{input.label}</label>
-                    <div className="relative group">
-                      <input 
-                        type="number" 
-                        value={input.value} 
-                        onChange={(e) => input.setter(Number(e.target.value))}
-                        className="w-full px-6 py-4 bg-surface-container-highest rounded-2xl outline-none font-mono text-on-surface focus:ring-2 ring-primary/20 transition-all border border-outline/5" 
-                      />
-                      <div className="absolute bottom-0 left-6 right-6 h-0.5 bg-primary scale-x-0 group-focus-within:scale-x-100 transition-transform origin-left" />
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-5">
+                <UnitInput
+                  label={<>Normal Stress <InlineMath math="\sigma_x" /></>}
+                  value={sigmaX}
+                  onChange={setSigmaX}
+                  unitType="stress"
+                />
+                <UnitInput
+                  label={<>Normal Stress <InlineMath math="\sigma_y" /></>}
+                  value={sigmaY}
+                  onChange={setSigmaY}
+                  unitType="stress"
+                />
+                <UnitInput
+                  label={<>Shear Stress <InlineMath math="\tau_{xy}" /></>}
+                  value={tauXY}
+                  onChange={setTauXY}
+                  unitType="stress"
+                />
+                <UnitInput
+                  label={<>Yield Strength S<sub className="lowercase">y</sub></>}
+                  value={sy}
+                  onChange={setSy}
+                  unitType="stress"
+                />
               </div>
             </div>
 
@@ -194,8 +201,8 @@ export default function FailureTheories() {
                 <div className="relative w-full aspect-square bg-surface-container-lowest rounded-[1.5rem] md:rounded-[2rem] overflow-hidden ambient-shadow">
                   <div className="absolute inset-0 opacity-10 pointer-events-none bg-engineering-grid" />
                   <svg viewBox={`0 0 ${svgSize} ${svgSize}`} className="w-full h-full">
-                    <line x1="0" y1={center} x2={svgSize} y2={center} stroke="black" strokeWidth="2.5" />
-                    <line x1={center} y1="0" x2={center} y2={svgSize} stroke="black" strokeWidth="2.5" />
+                    <line x1="0" y1={center} x2={svgSize} y2={center} stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
+                    <line x1={center} y1="0" x2={center} y2={svgSize} stroke="var(--color-on-surface)" strokeWidth="2.5" opacity="0.6" />
                     <path d={generateRankinePath()} fill="none" stroke="var(--color-orange-500, #f59e0b)" strokeWidth="2" strokeDasharray="4 4" opacity="0.4" />
                     <path d={generateVonMisesPath()} fill="rgba(60, 221, 199, 0.05)" stroke="var(--color-primary)" strokeWidth="3" />
                     <path d={generateTrescaPath()} fill="none" stroke="var(--color-on-surface-variant)" strokeWidth="2" strokeDasharray="8 4" opacity="0.5" />
